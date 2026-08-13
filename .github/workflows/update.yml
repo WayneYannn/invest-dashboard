@@ -1,9 +1,9 @@
-name: 更新投资看板数据并部署
+name: 定时更新
 
 on:
   schedule:
-    - cron: '30 15 * * *'   # 每日北京时间 23:30 抓取基金净值/金价并部署
-    - cron: '0 1 1 * *'     # 每月1日北京时间 09:00 抓取 + 推送微信提醒
+    - cron: '30 15 * * *'   # 每日定时抓取并部署
+    - cron: '0 1 1 * *'     # 每月1日额外推送提醒
   workflow_dispatch:        # 手动触发（在 Actions 页面点 Run workflow）
 
 permissions:
@@ -66,8 +66,8 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPO="${GITHUB_REPOSITORY##*/}"
           URL="https://${OWNER}.github.io/${REPO}/"
-          TITLE="📊 投资看板月度检查提醒"
-          DESP="本月该查看投资看板了。%0A%0A待办：%0A1. 打开看板确认基金净值/金价（已自动更新）%0A2. 手动填入 PB分位 / 股息率 / 国债收益率 / 黄金占比%0A3. 按信号执行定投或再平衡%0A%0A👉 ${URL}"
+          TITLE="📊 月度检查提醒"
+          DESP="本月该查看看板了。%0A%0A待办：%0A1. 确认自动更新的数据%0A2. 手动维护月度指标%0A3. 按信号执行操作%0A%0A👉 [点击打开看板](${URL})"
           if [ ${#SCKEY} -gt 30 ]; then
             # 新 Server酱（SENDKEY）
             curl -s -X POST "https://sctapi.ftqq.com/${SCKEY}.send" \
