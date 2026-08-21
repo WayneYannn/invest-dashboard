@@ -773,29 +773,29 @@ const RATES_STATIC = {
         2018:2.9,2019:2.5,2020:1.5,2021:2.3,2022:1.9,2023:1.8,2024: 1.4,2025:1.4
     }
 };
-const WIN_DAYS = { '1m':30, '3m':90, '6m':180, '1y':365, '3y':1095, '5y':1825, '10y':3650, 'all':99999 };
+const WIN_DAYS = { '1m':30, '3m':90, '6m':180, '1y':365, '3y':1095, '5y':1825, '10y':3650, 'all':0 };
 let RATE_CHART = null;
+let RATE_CUTOFF = null;   // 当前窗口起始时间戳（ms）
+let RATE_SPAN_DAYS = 365; // 当前窗口跨度（天），决定x轴刻度粒度
 
-function _mergeSeries(years) {
-    // 从静态年度基准构造 1月1日 的年初快照，再叠加新浪动态日频
+function _ts(s) { return new Date(s + 'T00:00:00+08:00').getTime(); }
+
+function _mergeSeries(cutoffTs) {
     const dyn10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? AUTO_RATES.history_10y : {};
     const dyn1  = (window.AUTO_RATES && AUTO_RATES.history_1y)  ? AUTO_RATES.history_1y  : {};
-    const out10 = {}, out1 = {};
-    // 静态：每年取年中代表点（YYYY-07-01）便于折线连续
-    for (const [y, v] of Object.entries(RATES_STATIC.y10)) {
-        if (y >= years[0] && y <= years[1]) { out10[`${y}-07-01`] = v; }
-    }
-    for (const [y, v] of Object.entries(RATES_STATIC.y1)) {
-        if (y >= years[0] && y <= years[1]) { out1[`${y}-07-01`] = v; }
-    }
-    // 动态覆盖近期
-    for (const [d, v] of Object.entries(dyn10)) {
-        if (d >= years[0]) out10[d] = v;
-    }
-    for (const [d, v] of Object.entries(dyn1)) {
-        if (d >= years[0]) out1[d] = v;
-    }
-    return { y10: out10, y1: out1 };
+    let pts10 = [], pts1 = [];
+    // 动态日频（新浪，2022-09 起）：按真实日期过滤
+    for (const [d, v] of Object.entries(dyn10)) { const t = _ts(d); if (t >= cutoffTs) pts10.push([t, v]); }
+    for (const [d, v] of Object.entries(dyn1))  { const t = _ts(d); if (t >= cutoffTs) pts1.push([t, v]); }
+    pts10.sort((a, b) => a[0] - b[0]);
+    pts1.sort((a, b) => a[0] - b[0]);
+    // 静态年度点：只补「动态序列起点之前」的历史，避免稀疏年度点混进短窗口
+    const dynStart = pts10.length ? pts10[0][0] : Infinity;
+    for (const [y, v] of Object.entries(RATES_STATIC.y10)) { const t = _ts(y + '-07-01'); if (t >= cutoffTs && t < dynStart) pts10.push([t, v]); }
+    for (const [y, v] of Object.entries(RATES_STATIC.y1))  { const t = _ts(y + '-07-01'); if (t >= cutoffTs && t < dynStart) pts1.push([t, v]); }
+    pts10.sort((a, b) => a[0] - b[0]);
+    pts1.sort((a, b) => a[0] - b[0]);
+    return { y10: pts10, y1: pts1 };
 }
 
 function drawRateChart(win) {
@@ -803,67 +803,66 @@ function drawRateChart(win) {
     document.querySelectorAll('#rateWindowBtns .win-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.win === win);
     });
-    const now = new Date();
-    let startYear;
-    if (win === 'all') startYear = 2002;
+    if (win === 'all') { RATE_CUTOFF = 0; RATE_SPAN_DAYS = 9000; }
     else {
         const days = WIN_DAYS[win] || 1095;
-        const d = new Date(now); d.setDate(d.getDate() - days);
-        startYear = d.getFullYear() - 1; // 多取1年静态过渡
+        RATE_CUTOFF = Date.now() - days * 86400000;
+        RATE_SPAN_DAYS = days;
     }
-    window._rateWinYears = [String(startYear), String(now.getFullYear())];
     redrawRateChart();
 }
 
+function _fmtTick(t) {
+    const d = new Date(t);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    if (RATE_SPAN_DAYS > 4 * 365) return String(y);   // 长窗口只标年份
+    if (RATE_SPAN_DAYS > 365) return y + '-' + m;     // 标年-月
+    return m + '-' + day;                             // 短窗口标月-日
+}
+
 function redrawRateChart() {
-    if (!window._rateWinYears) { drawRateChart('3y'); return; }
-    const [y0, y1] = window._rateWinYears;
-    const merged = _mergeSeries([parseInt(y0), parseInt(y1)]);
+    if (RATE_CUTOFF == null) { drawRateChart('3y'); return; }
+    const merged = _mergeSeries(RATE_CUTOFF);
     const show10 = document.getElementById('show10y').checked;
     const show1  = document.getElementById('show1y').checked;
     const showSp = document.getElementById('showSpread').checked;
 
+    const toPts = arr => arr.map(p => ({ x: p[0], y: p[1] }));
     const datasets = [];
-    const labels = [];
-    // 收集所有日期
-    const allDates = new Set();
-    if (show10) Object.keys(merged.y10).forEach(d => allDates.add(d));
-    if (show1)  Object.keys(merged.y1).forEach(d => allDates.add(d));
-    [...allDates].sort().forEach(d => labels.push(d));
-
     if (show10) {
-        const data = labels.map(d => merged.y10[d] != null ? merged.y10[d] : null);
-        datasets.push({ label:'10Y 长端', data, borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+        datasets.push({ label:'10Y 长端', data: toPts(merged.y10), borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
     }
     if (show1) {
-        const data = labels.map(d => merged.y1[d] != null ? merged.y1[d] : null);
-        datasets.push({ label:'1Y 短端', data, borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+        datasets.push({ label:'1Y 短端', data: toPts(merged.y1), borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
     }
     if (showSp && show10 && show1) {
-        const data = labels.map(d => (merged.y10[d] != null && merged.y1[d] != null) ? +(merged.y10[d] - merged.y1[d]).toFixed(3) : null);
-        datasets.push({ label:'利差(10Y-1Y)', data, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:.1, yAxisID:'y2' });
+        const m10 = new Map(merged.y10), m1 = new Map(merged.y1);
+        const sp = [...m10.keys()].filter(t => m1.has(t)).sort((a, b) => a - b)
+                    .map(t => ({ x: t, y: +(m10.get(t) - m1.get(t)).toFixed(3) }));
+        datasets.push({ label:'利差(10Y-1Y)', data: sp, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:.1, yAxisID:'y2' });
     }
 
     const ctx = document.getElementById('rateChart').getContext('2d');
     if (RATE_CHART) RATE_CHART.destroy();
     RATE_CHART = new Chart(ctx, {
         type:'line',
-        data:{ labels, datasets },
+        data:{ datasets },
         options:{
             responsive:true, maintainAspectRatio:false,
-            interaction:{ mode:'index', intersect:false },
+            interaction:{ mode:'nearest', axis:'x', intersect:false },
             scales:{
-                x:{ ticks:{ maxTicksLimit:8, font:{size:10}, callback:function(v){ return labels[v] ? labels[v].slice(0,7):''; } }, grid:{ display:false } },
+                x:{ type:'linear', min: RATE_CUTOFF || undefined, ticks:{ maxTicksLimit:9, font:{size:10}, callback: function(v){ return _fmtTick(v); } }, grid:{ display:false } },
                 y:{ ticks:{ font:{size:10} }, title:{ display:true, text:'收益率 %', font:{size:10} } },
-                y2:{ position:'right', display: showSp, title:{ display:true, text:'利差 %', font:{size:10} }, grid:{ drawOnChartArea:false } }
+                y2:{ position:'right', display: showSp && show10 && show1, title:{ display:true, text:'利差 %', font:{size:10} }, grid:{ drawOnChartArea:false } }
             },
-            plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:14 } }, tooltip:{ callbacks:{ title: items => items[0].label } } }
+            plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:14 } }, tooltip:{ callbacks:{ title: function(items){
+                const d = new Date(items[0].parsed.x);
+                return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+            } } } }
         }
     });
-}
-// 自动填充新浪动态序列供图表使用（由 applyRates 赋值）
-function bindRateHistory() {
-    window.AUTO_RATES = (window.AUTO_RATES && window.AUTO_RATES.history_10y) ? window.AUTO_RATES : null;
 }
 
 /* ===================== 债基体检卡 ===================== */
