@@ -117,6 +117,9 @@
         .note { font-size: 12px; color: #999; margin-top: 12px; }
         .auto-tag { font-size: 11px; color: #1a7f37; font-weight: 600; margin-left: 6px; }
         .auto-fail { background: #fff4f4; border: 1px solid #f3c2c2; color: #cf222e; }
+        .win-btn { font-size: 12px; padding: 5px 11px; border: 1px solid #d0d7de; background: #f6f8fa; color: #333; border-radius: 6px; cursor: pointer; transition: all .12s; }
+        .win-btn:hover { background: #eef1f4; }
+        .win-btn.active { background: #0969da; color: #fff; border-color: #0969da; }
     </style>
 </head>
 <body>
@@ -256,9 +259,36 @@
                 </ul>
             </div>
 
+            <!-- ============ 利率周期图表 ============ -->
+            <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <div style="font-weight:600;font-size:14px;color:#333;">📈 利率周期走势（国债收益率 %）</div>
+                    <div style="font-size:11px;color:#999;">纵轴=收益率(%) · 横轴=时间</div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="rateWindowBtns">
+                    <button class="win-btn" data-win="all" onclick="drawRateChart('all')">全部(20Y+)</button>
+                    <button class="win-btn" data-win="10y" onclick="drawRateChart('10y')">近10年</button>
+                    <button class="win-btn" data-win="5y" onclick="drawRateChart('5y')">近5年</button>
+                    <button class="win-btn active" data-win="3y" onclick="drawRateChart('3y')">近3年</button>
+                    <button class="win-btn" data-win="1y" onclick="drawRateChart('1y')">近1年</button>
+                    <button class="win-btn" data-win="6m" onclick="drawRateChart('6m')">近半年</button>
+                    <button class="win-btn" data-win="3m" onclick="drawRateChart('3m')">近3月</button>
+                    <button class="win-btn" data-win="1m" onclick="drawRateChart('1m')">近1月</button>
+                </div>
+                <div style="display:flex;gap:14px;font-size:11px;margin-bottom:6px;">
+                    <label style="color:#c0392b;"><input type="checkbox" id="show10y" checked onchange="redrawRateChart()"> 10Y（长端）</label>
+                    <label style="color:#2980b9;"><input type="checkbox" id="show1y" checked onchange="redrawRateChart()"> 1Y（短端）</label>
+                    <label style="color:#7f8c8d;"><input type="checkbox" id="showSpread" onchange="redrawRateChart()"> 利差(10Y-1Y)</label>
+                </div>
+                <canvas id="rateChart" height="220"></canvas>
+                <div style="font-size:11px;color:#999;margin-top:4px;">
+                    静态基准：2002–2025 年度均值（Wind/Choice 口径，多家研报交叉）；动态：新浪日频自动抓取（2022-09 起）。数据为历史事实整理，非实时预测。
+                </div>
+            </div>
+
             <div class="sources">
                 <strong>数据来源：</strong><br>
-                国债收益率：<a href="https://data.eastmoney.com/cjsj/zmgpjyl.html" target="_blank">东方财富-中美国债收益率</a>
+                国债收益率：<a href="https://data.eastmoney.com/cjsj/zmgpjyl.html" target="_blank">东方财富-中美国债收益率</a>、新浪债券频道（自动抓取）
             </div>
         </div>
 
@@ -658,12 +688,17 @@ function applyRates(rates) {
             fieldsNote.push('利差');
         }
         if (srcEl) srcEl.innerHTML = '<span class="auto-tag">自动 · ' + rates.source + '</span>';
+        // 保存新浪动态序列供图表使用
+        if (rates.history_10y || rates.history_1y) {
+            window.AUTO_RATES = { history_10y: rates.history_10y || {}, history_1y: rates.history_1y || {} };
+        }
     } else {
         RATE_SOURCE = 'manual';
         if (srcEl) srcEl.innerHTML = '<span style="color:#cf222e;font-size:11px;font-weight:600;">手动 · 自动源不可用，请自行录入</span>';
     }
     calcBond();
     renderCycleSignals();
+    drawRateChart('3y');   // 默认绘制近3年
 }
 function markAuto(id) {
     const el = document.getElementById(id);
@@ -718,6 +753,117 @@ function renderCycleSignals() {
     if (envEl) {
         envEl.innerHTML = `<strong>环境判断：${sig.s1} · ${sig.s3}</strong><br>综合多信号，按上方规则执行。`;
     }
+}
+
+/* ===================== 利率周期图表 ===================== */
+// 静态基准：2002–2025 中国国债收益率年度均值（%）
+// 来源：Wind/Choice 口径，招商/华泰/粤开/方正等多家研报交叉整理（年末点位与年均混合，取近似中点）
+// 2022-09 起由新浪日频补全（动态）。早期1Y为近似，已在注释标明。
+const RATES_STATIC = {
+    // 10Y 年度均值
+    y10: {
+        2002:3.2,2003:3.0,2004:4.5,2005:3.5,2006:3.0,2007:4.5,2008:4.0,2009:3.0,
+        2010:3.5,2011:4.0,2012:3.5,2013:4.2,2014:4.2,2015:3.4,2016:2.9,2017:3.6,
+        2018:3.2,2019:3.1,2020:3.1,2021:2.9,2022:2.8,2023:2.6,2024:2.2,2025:1.7
+    },
+    // 1Y 年度均值（2002-2007 为近似值，2008起较可靠）
+    y1: {
+        2002:2.0,2003:2.0,2004:2.5,2005:2.0,2006:2.0,2007:2.5,2008:3.0,2009:1.1,
+        2010:1.5,2011:3.0,2012:2.8,2013:3.1,2014:3.3,2015:2.3,2016:2.2,2017:3.0,
+        2018:2.9,2019:2.5,2020:1.5,2021:2.3,2022:1.9,2023:1.8,2024: 1.4,2025:1.4
+    }
+};
+const WIN_DAYS = { '1m':30, '3m':90, '6m':180, '1y':365, '3y':1095, '5y':1825, '10y':3650, 'all':99999 };
+let RATE_CHART = null;
+
+function _mergeSeries(years) {
+    // 从静态年度基准构造 1月1日 的年初快照，再叠加新浪动态日频
+    const dyn10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? AUTO_RATES.history_10y : {};
+    const dyn1  = (window.AUTO_RATES && AUTO_RATES.history_1y)  ? AUTO_RATES.history_1y  : {};
+    const out10 = {}, out1 = {};
+    // 静态：每年取年中代表点（YYYY-07-01）便于折线连续
+    for (const [y, v] of Object.entries(RATES_STATIC.y10)) {
+        if (y >= years[0] && y <= years[1]) { out10[`${y}-07-01`] = v; }
+    }
+    for (const [y, v] of Object.entries(RATES_STATIC.y1)) {
+        if (y >= years[0] && y <= years[1]) { out1[`${y}-07-01`] = v; }
+    }
+    // 动态覆盖近期
+    for (const [d, v] of Object.entries(dyn10)) {
+        if (d >= years[0]) out10[d] = v;
+    }
+    for (const [d, v] of Object.entries(dyn1)) {
+        if (d >= years[0]) out1[d] = v;
+    }
+    return { y10: out10, y1: out1 };
+}
+
+function drawRateChart(win) {
+    // 高亮按钮
+    document.querySelectorAll('#rateWindowBtns .win-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.win === win);
+    });
+    const now = new Date();
+    let startYear;
+    if (win === 'all') startYear = 2002;
+    else {
+        const days = WIN_DAYS[win] || 1095;
+        const d = new Date(now); d.setDate(d.getDate() - days);
+        startYear = d.getFullYear() - 1; // 多取1年静态过渡
+    }
+    window._rateWinYears = [String(startYear), String(now.getFullYear())];
+    redrawRateChart();
+}
+
+function redrawRateChart() {
+    if (!window._rateWinYears) { drawRateChart('3y'); return; }
+    const [y0, y1] = window._rateWinYears;
+    const merged = _mergeSeries([parseInt(y0), parseInt(y1)]);
+    const show10 = document.getElementById('show10y').checked;
+    const show1  = document.getElementById('show1y').checked;
+    const showSp = document.getElementById('showSpread').checked;
+
+    const datasets = [];
+    const labels = [];
+    // 收集所有日期
+    const allDates = new Set();
+    if (show10) Object.keys(merged.y10).forEach(d => allDates.add(d));
+    if (show1)  Object.keys(merged.y1).forEach(d => allDates.add(d));
+    [...allDates].sort().forEach(d => labels.push(d));
+
+    if (show10) {
+        const data = labels.map(d => merged.y10[d] != null ? merged.y10[d] : null);
+        datasets.push({ label:'10Y 长端', data, borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+    }
+    if (show1) {
+        const data = labels.map(d => merged.y1[d] != null ? merged.y1[d] : null);
+        datasets.push({ label:'1Y 短端', data, borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+    }
+    if (showSp && show10 && show1) {
+        const data = labels.map(d => (merged.y10[d] != null && merged.y1[d] != null) ? +(merged.y10[d] - merged.y1[d]).toFixed(3) : null);
+        datasets.push({ label:'利差(10Y-1Y)', data, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:.1, yAxisID:'y2' });
+    }
+
+    const ctx = document.getElementById('rateChart').getContext('2d');
+    if (RATE_CHART) RATE_CHART.destroy();
+    RATE_CHART = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets },
+        options:{
+            responsive:true, maintainAspectRatio:false,
+            interaction:{ mode:'index', intersect:false },
+            scales:{
+                x:{ ticks:{ maxTicksLimit:8, font:{size:10}, callback:function(v){ return labels[v] ? labels[v].slice(0,7):''; } }, grid:{ display:false } },
+                y:{ ticks:{ font:{size:10} }, title:{ display:true, text:'收益率 %', font:{size:10} } },
+                y2:{ position:'right', display: showSp, title:{ display:true, text:'利差 %', font:{size:10} }, grid:{ drawOnChartArea:false } }
+            },
+            plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:14 } }, tooltip:{ callbacks:{ title: items => items[0].label } } }
+        }
+    });
+}
+// 自动填充新浪动态序列供图表使用（由 applyRates 赋值）
+function bindRateHistory() {
+    window.AUTO_RATES = (window.AUTO_RATES && window.AUTO_RATES.history_10y) ? window.AUTO_RATES : null;
 }
 
 /* ===================== 债基体检卡 ===================== */

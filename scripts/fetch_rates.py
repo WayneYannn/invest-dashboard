@@ -54,29 +54,43 @@ SINA_SYMBOL = {
 }
 
 
-def _sina_latest(symbol):
-    """取新浪某期限国债收益率的最新收盘值（% 浮点）与日期"""
+def _sina_series(symbol):
+    """取新浪某期限国债收益率的完整序列（最新1000交易日，含历史）。
+    返回 (latest_val, latest_date, history_dict)，history_dict = {日期: 收益率%}"""
     url = f'https://bond.finance.sina.com.cn/hq/gb/daily?symbol={symbol}'
     d = fetch_json(url)
     rows = d.get('result', {}).get('data', [])
     if not rows:
-        return None, None
+        return None, None, {}
     last = rows[-1]
-    return float(last['c']), last['d']
+    latest_val = float(last['c'])
+    latest_date = last['d']
+    history = {}
+    for r in rows:
+        try:
+            history[r['d']] = float(r['c'])
+        except (ValueError, KeyError):
+            continue
+    return latest_val, latest_date, history
 
 
 def src_sina_bond():
-    """新浪债券：返回 {y10, y2, y1}，含最新日期"""
+    """新浪债券：返回 {y10, y2, y1, history_10y, history_2y, history_1y, _src_dates}"""
     out = {}
     dates = {}
+    histories = {}
     for key, sym in SINA_SYMBOL.items():
-        val, dt = _sina_latest(sym)
+        val, dt, hist = _sina_series(sym)
         if val is not None:
             out[key] = val
             dates[key] = dt
+            # 历史序列字段名映射：y10->history_10y, y1->history_1y, y2->history_2y
+            hk = 'history_' + key[1:] + ('y' if not key.endswith('y') else '')
+            histories[hk] = hist
     if not out:
         return None
     out['_src_dates'] = dates
+    out.update(histories)
     return out
 
 
