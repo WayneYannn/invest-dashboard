@@ -213,7 +213,7 @@
     <!-- ============ 债基 ============ -->
     <div id="bond" class="tab-content">
         <div class="card">
-            <div class="card-title"><span class="icon">🏦</span>债基 — 市场环境</div>
+            <div class="card-title"><span class="icon">🏦</span>债基 — 市场环境 <span id="rateSourceTag"><span class="auto-tag">手动</span></span></div>
 
             <div class="indicator-row">
                 <div class="left">
@@ -259,6 +259,183 @@
             <div class="sources">
                 <strong>数据来源：</strong><br>
                 国债收益率：<a href="https://data.eastmoney.com/cjsj/zmgpjyl.html" target="_blank">东方财富-中美国债收益率</a>
+            </div>
+        </div>
+
+        <!-- ============ 债基认知框架（知识图谱折叠树） ============ -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🌳</span>债基认知框架 <span class="auto-tag">知识图谱</span></div>
+            <div class="note" style="margin-top:0;margin-bottom:14px;">按「是什么/怎么赚 → 为什么波动 → 怎么辨别优劣」三层递进。点击每层展开节点详情。</div>
+
+            <details open>
+                <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#333;padding:8px 0;">第一层 · 债基是什么 &amp; 如何赚钱</summary>
+                <div style="padding:10px 0 4px 16px;">
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">1.1 本质</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">债基＝一篮子债券的集合，净值跟着底层债券二手市价走。你持有的是「一群借款人的债权组合」，不是单只债。</div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">1.2 两个收益来源</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • <b>票息（主收益）</b>：发行人按合同定期付息，固定可预期，长期回报主要靠这个。<br>
+                            • <b>资本利得（次收益）</b>：利率下降时旧债涨价，卖出赚差价。周期红利，不可持续，别当常态。<br>
+                            • <b>关键</b>：票息固定 ≠ 净值不波动。利息是合同定的，净值每天变因为净值＝底层债券二手市价。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">1.3 底层资产三维（谁借钱·借多久·怎么还）</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • <b>谁借钱（信用）</b>：国债/政金债（近似无风险）→ 中高等级信用债 → 低评级（违约风险）。越弱票息越高、风险越大。<br>
+                            • <b>借多久（久期）</b>：短债(&lt;1年)/中短/长债。越久票息越高、对利率越敏感。<br>
+                            • <b>怎么还（偿付）</b>：到期还本/摊还/永续等，影响现金流与本金确定性。<br>
+                            • <b>组合视角</b>：长久期+低评级＝高收益高风险；短久期+利率债＝低波动安全垫。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">1.4 债基 vs 单只债券</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">单只债到期还本付息、违约才亏；债基是组合，每日净值化，分散了单券违约风险，但有管理费/托管费会侵蚀票息，长期要算费后收益。</div>
+                    </details>
+                </div>
+            </details>
+
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#333;padding:8px 0;">第二层 · 债基是如何波动的</summary>
+                <div style="padding:10px 0 4px 16px;">
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">2.1 核心：利率与价格反向</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">市场利率↑→存量债价↓；利率↓→债价↑。日常波动的总开关。</div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">2.2 久期＝波动放大器</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">久期越长，对利率越敏感，涨跌被放大（可理解为「放大镜倍数」）。</div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">2.3 利率周期三状态（10Y 定位）</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • 降息通道（10Y &lt;2.0% 且下行）：价涨，长债吃资本利得。<br>
+                            • 加息通道（10Y &gt;2.5% 且上行）：价跌，短债更扛跌。<br>
+                            • 震荡（1.8%–2.5% 横盘）：票息为主，难有暴涨。<br>
+                            • <b>当前警示</b>：2024–26 处于 1.0%–1.7% 低位震荡，非单边降息，「长债年化9%」是阶段性红利不是长期能力。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">2.4 其他波动驱动（非利率）</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • <b>信用利差</b>：经济差时信用债相对国债利差走阔，信用债价跌——利率没动也会跌。<br>
+                            • <b>流动性冲击</b>：钱荒/赎回潮时债基被迫低价抛券，净值异常下挫（技术性，会回来）。<br>
+                            • <b>通胀预期</b>：通胀抬头推升名义利率预期，压制债价。<br>
+                            • <b>回撤三步归因</b>：看到跌先问——加息(利率型·暂时)？信用事件(信用型·真亏)？流动性冲击(技术性·会回来)？性质不同动作不同。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">2.5 为何「长期持有不动」在债基上基本成立</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">利率型与流动性回撤会随周期回归，信用型可通过穿透规避。核心纪律是「拿得住+穿透避信用雷」，而非频繁择时（与股票逻辑相反）。</div>
+                    </details>
+                </div>
+            </details>
+
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#333;padding:8px 0;">第三层 · 如何辨别一只债基优劣（穿透 + 周期择基）</summary>
+                <div style="padding:10px 0 4px 16px;">
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">3.1 穿透方法论</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">不看出名气/收益排名，而是把第一层(底层资产)和第二层(利率/久期/信用暴露)合起来审：穿透后买了什么、久期多长、信用多烂。</div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">3.2 三个静态判别信号</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • <b>信用等级</b>（会不会真亏）：底层有无低评级/高收益债。<br>
+                            • <b>久期长短</b>（波动大不大）：匹配自身忍受度而非只看收益。<br>
+                            • <b>历史回撤性质</b>：最大回撤是利率型(暂时)还是信用型(永久)。前者可扛，后者避开。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">3.3 周期择基（上行买啥 / 下行买啥）</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • <b>降息/下行</b>：偏好长久期债基——久期放大涨价收益，可适度下沉信用博票息。<br>
+                            • <b>加息/上行</b>：偏好短久期债基——缩短久期减小跌价暴露，靠票息+快到期托底。<br>
+                            • <b>震荡</b>：中等久期+高等级，票息为王，不赌方向。<br>
+                            • <b>信用利差走阔时</b>：降信用暴露，往利率债/高等级靠。<br>
+                            • <b>关键</b>：优劣＝「周期匹配度」，同一只长债基降息期是优、加息期变劣。脱离周期说「这只基好」无意义。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">3.4 回撤纪律线 &amp; 诊断优先序</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">
+                            • &gt;3% 黄警；&gt;5% 红警，优先查信用而非利率。<br>
+                            • 反向观测：长债连续3月年化&lt;2%或转负 → 诊断(加息？信用？流动性？)。<br>
+                            • 目标锚：年化3% / 回撤&lt;3% / 持有≥12月。<br>
+                            • <b>诊断优先序</b>：红警先排除信用(真亏)→再流动性(技术性)→最后利率(暂时扛)。顺序错会把「暂时回撤」误判成「该跑」。
+                        </div>
+                    </details>
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-weight:500;color:#333;">3.5 优劣判断口诀</summary>
+                        <div style="padding:6px 0 6px 16px;font-size:13px;color:#555;">穿透看信用(稳不稳)→看久期(波动大不大)→看回撤性质(亏了回不回得来)→看周期匹配(当前该拿长还是短)。四关过，才是好债基。</div>
+                    </details>
+                </div>
+            </details>
+        </div>
+
+        <!-- ============ 债基体检卡（半自动穿透判断） ============ -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🩺</span>债基体检卡 <span class="auto-tag">半自动</span></div>
+            <div class="note" style="margin-top:0;margin-bottom:16px;">填入该基金最新季报披露的底层截面（一年 4 次，季报发布后填），系统结合下方实时周期信号，输出基本面判断。字段均来自公开季报，无需盯盘。</div>
+
+            <div class="indicator-row">
+                <div class="left">
+                    <div class="label">基金名称 / 代码</div>
+                    <div class="desc">如：东方添益债券 400030</div>
+                </div>
+                <input type="text" id="diagName" placeholder="名称 代码" style="width:200px;">
+            </div>
+
+            <div class="indicator-row">
+                <div class="left">
+                    <div class="label">久期类型</div>
+                    <div class="desc">季报披露的久期区间/加权平均久期</div>
+                </div>
+                <select id="diagDuration" style="width:160px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                    <option value="short">短久期 (&lt;2年)</option>
+                    <option value="mid" selected>中久期 (2–5年)</option>
+                    <option value="long">长久期 (&gt;5年)</option>
+                </select>
+            </div>
+
+            <div class="indicator-row">
+                <div class="left">
+                    <div class="label">信用等级</div>
+                    <div class="desc">穿透后底层债券评级分布</div>
+                </div>
+                <select id="diagCredit" style="width:160px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                    <option value="rate">利率债/高等级 (近似无风险)</option>
+                    <option value="mid" selected>中高等级信用债</option>
+                    <option value="low">含低评级/高收益债</option>
+                </select>
+            </div>
+
+            <div class="indicator-row">
+                <div class="left">
+                    <div class="label">你的风险承受</div>
+                    <div class="desc">能接受的最大回撤</div>
+                </div>
+                <select id="diagRisk" style="width:160px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+                    <option value="low">保守 (&lt;2%)</option>
+                    <option value="mid" selected>中性 (2–5%)</option>
+                    <option value="high">进取 (&gt;5%)</option>
+                </select>
+            </div>
+
+            <button onclick="runDiagnosis()" style="margin-top:8px;padding:10px 20px;background:#0969da;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">生成基本面判断</button>
+
+            <div class="recommendation rec-info" id="diagResult" style="display:none;margin-top:16px;">
+                <strong>判断结果</strong><br>
+                <span id="diagVerdict"></span>
+                <ul id="diagReasons" style="margin:10px 0 0 20px;font-size:13px;"></ul>
+            </div>
+
+            <div class="sources" style="margin-top:16px;">
+                <strong>实时周期信号（来自看板自动/手动利率）：</strong><br>
+                <span id="diagCycleSignals" style="font-size:13px;color:#555;">加载中…</span>
             </div>
         </div>
 
@@ -405,6 +582,9 @@ function renderAuto(d) {
     if (t) t = t.replace('T', ' ').slice(0, 16) + ' (北京时间)';
     document.getElementById('updTime').textContent = '自动数据更新于：' + t;
 
+    // 利率信号：auto.json.rates 优先覆盖手动框
+    applyRates(d.rates);
+
     // 基金净值表
     const bondCodes = ['400030','007744','018771'];
     const y1 = {'400030':'2.87%','007744':'2.66%','018771':'1.54%'};
@@ -459,6 +639,141 @@ function renderAuto(d) {
         const firstRow = goldCard.querySelector('.indicator-row');
         goldCard.insertBefore(tip, firstRow);
     }
+}
+
+/* ===================== 利率信号：自动覆盖手动 ===================== */
+let RATE_SOURCE = 'manual';           // 'auto' / 'manual'
+function applyRates(rates) {
+    const srcEl = document.getElementById('rateSourceTag');
+    if (rates && rates.source && rates.source !== 'manual_required'
+        && (rates.y10 != null || rates.y1 != null || rates.cpi != null || rates.mlf != null)) {
+        RATE_SOURCE = 'auto';
+        let fieldsNote = [];
+        if (rates.y10 != null) { document.getElementById('bondYield10').value = rates.y10.toFixed(2); markAuto('bondYield10'); fieldsNote.push('10Y'); }
+        if (rates.y1 != null)  { document.getElementById('bondYield1').value  = rates.y1.toFixed(2);  markAuto('bondYield1');  fieldsNote.push('1Y'); }
+        // 期限利差用 10Y-1Y（自动源给出 y1，更贴合该框定义）
+        if (rates.y10 != null && rates.y1 != null) {
+            const sp = (rates.y10 - rates.y1).toFixed(2);
+            document.getElementById('termSpread').value = sp; markAuto('termSpread');
+            fieldsNote.push('利差');
+        }
+        if (srcEl) srcEl.innerHTML = '<span class="auto-tag">自动 · ' + rates.source + '</span>';
+    } else {
+        RATE_SOURCE = 'manual';
+        if (srcEl) srcEl.innerHTML = '<span style="color:#cf222e;font-size:11px;font-weight:600;">手动 · 自动源不可用，请自行录入</span>';
+    }
+    calcBond();
+    renderCycleSignals();
+}
+function markAuto(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('auto-filled');
+}
+
+/* ===================== 周期信号计算（S1–S4） ===================== */
+function calcSignals() {
+    const y10 = parseFloat(document.getElementById('bondYield10').value) || 0;
+    const y2 = parseFloat(document.getElementById('bondYield1').value) || 0;
+    const spread = parseFloat(document.getElementById('termSpread').value) || 0;
+    // 基准分位（近5年经验区间，实际可由历史序列替换）
+    const Y10_LOW = 1.5, Y10_HIGH = 3.0;   // 近5年大致运行区间
+    const pct = Math.max(0, Math.min(100, (y10 - Y10_LOW) / (Y10_HIGH - Y10_LOW) * 100));
+
+    // S1 相对位置法：依赖分位+趋势（趋势用经验默认横盘，可由历史序列增强）
+    let s1 = '震荡（横盘）';
+    if (pct < 20) s1 = '降息通道（低位）';
+    else if (pct > 80) s1 = '加息通道（高位）';
+
+    // S2 政策意图法：MLF 未自动获取时用10Y相对中枢判断宽松/收紧
+    let s2 = '中性';
+    if (y10 < 2.0) s2 = '宽松（利率偏低）';
+    else if (y10 > 2.5) s2 = '收紧（利率偏高）';
+
+    // S3 曲线形态法：期限利差
+    let s3 = '中性（利差居中）';
+    if (spread < 0) s3 = '防御（曲线倒挂）';
+    else if (spread > 0.6) s3 = '进攻（曲线陡峭）';
+
+    // S4 实际利率法：名义-通胀（通胀默认2%，可由CPI替换）
+    const cpi = 2.0;
+    const real = y10 - cpi;
+    let s4 = '中性（实际利率近0）';
+    if (real < 0) s4 = '宽松（实际利率为负）';
+    else if (real > 1) s4 = '收紧（实际利率为正且高）';
+
+    return { y10, y2, spread, pct, s1, s2, s3, s4 };
+}
+function renderCycleSignals() {
+    const sig = calcSignals();
+    const box = document.getElementById('diagCycleSignals');
+    if (box) {
+        box.innerHTML =
+            `当前10Y=${sig.y10.toFixed(2)}%　利差=${sig.spread.toFixed(2)}%<br>` +
+            `S1 相对位置：${sig.s1}<br>` +
+            `S2 政策意图：${sig.s2}<br>` +
+            `S3 曲线形态：${sig.s3}<br>` +
+            `S4 实际利率：${sig.s4}`;
+    }
+    const envEl = document.getElementById('bondEnvRec');
+    if (envEl) {
+        envEl.innerHTML = `<strong>环境判断：${sig.s1} · ${sig.s3}</strong><br>综合多信号，按上方规则执行。`;
+    }
+}
+
+/* ===================== 债基体检卡 ===================== */
+function runDiagnosis() {
+    const name = document.getElementById('diagName').value.trim() || '未命名基金';
+    const dur = document.getElementById('diagDuration').value;
+    const credit = document.getElementById('diagCredit').value;
+    const risk = document.getElementById('diagRisk').value;
+    const sig = calcSignals();
+
+    const reasons = [];
+    let score = 0;   // 正向=可买，负向=不可买
+
+    // 信用维度（决定性）
+    if (credit === 'low') { score -= 3; reasons.push('⚠️ 含低评级/高收益债：存在信用型真亏风险，本金可能永久损失。'); }
+    else if (credit === 'mid') { score += 1; reasons.push('✓ 中高等级信用债：信用可控，票息略高于利率债。'); }
+    else { score += 2; reasons.push('✓ 利率债/高等级：近似无信用风险。'); }
+
+    // 久期 vs 周期匹配
+    const easing = (sig.s1.indexOf('降息') >= 0) || (sig.s2.indexOf('宽松') >= 0);
+    const tightening = (sig.s1.indexOf('加息') >= 0) || (sig.s2.indexOf('收紧') >= 0);
+    if (dur === 'long') {
+        if (easing) { score += 2; reasons.push('✓ 长久期 + 当前宽松/降息信号：资本利得顺风。'); }
+        else if (tightening) { score -= 2; reasons.push('⚠️ 长久期 + 当前收紧/加息信号：久期放大跌价，逆风。'); }
+        else { reasons.push('• 长久期 + 震荡：票息为主，波动中性。'); }
+    } else if (dur === 'short') {
+        if (tightening) { score += 2; reasons.push('✓ 短久期 + 当前收紧：抗跌，靠票息+快到期托底。'); }
+        else if (easing) { reasons.push('• 短久期 + 宽松：稳健但错过部分涨价收益。'); }
+        else { score += 1; reasons.push('✓ 短久期 + 震荡：防御稳健。'); }
+    } else {
+        reasons.push('• 中久期：攻守平衡，匹配多数环境。'); score += 1;
+    }
+
+    // 风险承受匹配
+    const riskTol = { low: 2, mid: 5, high: 99 }[risk];
+    const estDrawdown = { short: 1.5, mid: 3.5, long: 6 }[dur];
+    if (estDrawdown > riskTol) {
+        score -= 1; reasons.push(`⚠️ 预估最大回撤约${estDrawdown}%，超出你的风险承受(${riskTol}%)。`);
+    } else {
+        reasons.push(`✓ 预估回撤约${estDrawdown}% ≤ 你的承受(${riskTol}%)。`);
+    }
+
+    // 曲线形态补充
+    if (sig.s3.indexOf('倒挂') >= 0) { reasons.push('⚠️ 曲线倒挂：衰退预警，建议降久期/信用暴露。'); score -= 1; }
+
+    // 结论
+    let verdict, cls;
+    if (score >= 3) { verdict = '✅ 可买 / 适配'; cls = 'rec-buy'; }
+    else if (score >= 0) { verdict = '🟡 谨慎 / 匹配度一般'; cls = 'rec-hold'; }
+    else { verdict = '🔴 不可买 / 当前不匹配'; cls = 'rec-sell'; }
+
+    const res = document.getElementById('diagResult');
+    res.style.display = 'block';
+    res.className = 'recommendation ' + cls;
+    document.getElementById('diagVerdict').textContent = `【${name}】基本面判断：${verdict}`;
+    document.getElementById('diagReasons').innerHTML = reasons.map(r => `<li>${r}</li>`).join('');
 }
 
 /* ===================== 手动值持久化 ===================== */
