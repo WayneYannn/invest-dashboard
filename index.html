@@ -129,7 +129,7 @@
 
     <div class="data-bar" id="dataBar">
         <span class="upd" id="updTime">自动数据加载中…</span>
-        <span class="upd" style="color:#999;">页面版本 v2026.08.22-3</span>
+        <span class="upd" style="color:#999;">页面版本 v2026.08.22-4</span>
         <span class="legend"><b class="auto">● 自动</b> 基金净值 / 金价　<b class="manual">● 手动</b> PB分位 / 股息率 / 国债收益率 / 仓位</span>
         <span class="tools">
             <button onclick="exportManual()">导出手动值</button>
@@ -454,6 +454,15 @@
             <div class="card-title"><span class="icon">🩺</span>债基体检卡 <span class="auto-tag">半自动</span></div>
             <div class="note" style="margin-top:0;margin-bottom:16px;">填入该基金最新季报披露的底层截面（一年 4 次，季报发布后填），系统结合下方实时周期信号，输出基本面判断。字段均来自公开季报，无需盯盘。</div>
 
+            <!-- 已保存债基（data/bonds.json 自动加载，截图体检后导出） -->
+            <div id="savedBondsBox" style="display:none;margin-bottom:14px;padding:10px 12px;background:#f6f8fa;border-radius:6px;border:1px solid #e3e3e3;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <strong style="font-size:13px;color:#333;">📋 已保存债基（穿透数据）</strong>
+                    <span id="savedBondsDate" style="font-size:11px;color:#999;"></span>
+                </div>
+                <div id="savedBondsList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
+
             <div class="indicator-row">
                 <div class="left">
                     <div class="label">基金名称 / 代码</div>
@@ -498,7 +507,29 @@
                 </select>
             </div>
 
+            <!-- 定量穿透数据输入（折叠，截图回填用） -->
+            <details style="margin-top:10px;padding:8px 12px;background:#fafbfc;border-radius:6px;border:1px solid #e3e3e3;">
+                <summary style="cursor:pointer;font-weight:500;font-size:13px;color:#555;">📐 定量穿透数据（可选，截图后填，导出存档）</summary>
+                <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:12px;">
+                    <div><label style="color:#666;">利率债占比 (%)</label><input type="number" id="diagRateRatio" step="0.1" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 85"></div>
+                    <div><label style="color:#666;">信用债占比 (%)</label><input type="number" id="diagCreditRatio" step="0.1" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 10"></div>
+                    <div><label style="color:#666;">AA+及以上占比 (%)</label><input type="number" id="diagAaPlusRatio" step="0.1" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 95"></div>
+                    <div><label style="color:#666;">规模 (亿)</label><input type="number" id="diagScale" step="0.1" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 200"></div>
+                    <div><label style="color:#666;">杠杆率 (倍)</label><input type="number" id="diagLeverage" step="0.01" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 1.1"></div>
+                    <div><label style="color:#666;">季报日期</label><input type="text" id="diagReportDate" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 2026Q2"></div>
+                    <div style="grid-column:1/-1;"><label style="color:#666;">前五大重仓（逗号/顿号分隔）</label><input type="text" id="diagTop5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;margin-top:2px;" placeholder="如 19附息国债14, 21国开05, …"></div>
+                </div>
+            </details>
+
             <button onclick="runDiagnosis()" style="margin-top:8px;padding:10px 20px;background:#0969da;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">生成基本面判断</button>
+            <button onclick="exportCurrentBond()" style="margin-top:8px;margin-left:6px;padding:10px 20px;background:#fff;color:#0969da;border:1px solid #0969da;border-radius:8px;font-size:14px;cursor:pointer;">导出当前为 bonds.json</button>
+
+            <!-- 定量穿透数据展示（有 bonds.json 数据时显示） -->
+            <div id="diagHoldingsBox" style="display:none;margin-top:14px;padding:12px;background:#fafbfc;border-radius:6px;border:1px solid #e3e3e3;">
+                <strong style="font-size:13px;color:#333;">📊 底层穿透数据</strong>
+                <span id="diagHoldingsDate" style="font-size:11px;color:#999;margin-left:8px;"></span>
+                <div id="diagHoldings" style="margin-top:8px;font-size:13px;color:#555;line-height:1.8;"></div>
+            </div>
 
             <div class="recommendation rec-info" id="diagResult" style="display:none;margin-top:16px;">
                 <strong>判断结果</strong><br>
@@ -641,6 +672,134 @@ async function loadAuto() {
         document.getElementById('bondFundBody').innerHTML =
             '<tr><td colspan="9" style="text-align:center;color:#cf222e;">净值加载失败，请通过 GitHub Pages 访问</td></tr>';
         console.warn('auto.json 加载失败:', e);
+    }
+    // 加载已保存的债基穿透数据（可选，失败不阻塞）
+    loadBonds();
+}
+
+/* ===================== 债基穿透数据加载（data/bonds.json） ===================== */
+// bonds.json 结构: { updated_at, source, bonds: { "400030": { name, duration, credit, rate_ratio, credit_ratio, aa_plus_ratio, scale, leverage, top5:[], report_date } } }
+let BONDS_DATA = null;
+
+async function loadBonds() {
+    try {
+        const res = await fetch('data/bonds.json?t=' + Date.now());
+        if (!res.ok) return;
+        BONDS_DATA = await res.json();
+        renderSavedBonds();
+    } catch (e) {
+        // 文件不存在或解析失败：静默降级到手填
+        BONDS_DATA = null;
+    }
+}
+
+function renderSavedBonds() {
+    const box = document.getElementById('savedBondsBox');
+    const list = document.getElementById('savedBondsList');
+    const dateEl = document.getElementById('savedBondsDate');
+    if (!box || !list) return;
+    if (!BONDS_DATA || !BONDS_DATA.bonds) { box.style.display = 'none'; return; }
+    const codes = Object.keys(BONDS_DATA.bonds);
+    if (!codes.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    if (BONDS_DATA.updated_at) dateEl.textContent = '更新：' + BONDS_DATA.updated_at.slice(0, 10);
+    list.innerHTML = codes.map(code => {
+        const b = BONDS_DATA.bonds[code];
+        const durTxt = { short:'短', mid:'中', long:'长' }[b.duration] || '中';
+        const credTxt = { rate:'利率', mid:'中高', low:'低评' }[b.credit] || '中高';
+        return `<button onclick="loadBondToDiag('${code}')" style="padding:6px 12px;background:#fff;border:1px solid #d0d7de;border-radius:6px;font-size:12px;cursor:pointer;">${b.name || code}<br><span style="color:#999;font-size:10px;">${code} · ${durTxt}久期 · ${credTxt}信用</span></button>`;
+    }).join('');
+}
+
+function loadBondToDiag(code) {
+    if (!BONDS_DATA || !BONDS_DATA.bonds || !BONDS_DATA.bonds[code]) return;
+    const b = BONDS_DATA.bonds[code];
+    document.getElementById('diagName').value = (b.name ? b.name + ' ' : '') + code;
+    if (b.duration) document.getElementById('diagDuration').value = b.duration;
+    if (b.credit) document.getElementById('diagCredit').value = b.credit;
+    // 定量字段回填到输入框，供 runDiagnosis 读取
+    const setNum = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    setNum('diagRateRatio', b.rate_ratio);
+    setNum('diagCreditRatio', b.credit_ratio);
+    setNum('diagAaPlusRatio', b.aa_plus_ratio);
+    setNum('diagScale', b.scale);
+    setNum('diagLeverage', b.leverage);
+    const top5El = document.getElementById('diagTop5');
+    if (top5El && b.top5) top5El.value = b.top5.join('、');
+    const rdEl = document.getElementById('diagReportDate');
+    if (rdEl && b.report_date) rdEl.value = b.report_date;
+    renderHoldings(b);
+    runDiagnosis();
+}
+
+function renderHoldings(b) {
+    const box = document.getElementById('diagHoldingsBox');
+    const div = document.getElementById('diagHoldings');
+    const dateEl = document.getElementById('diagHoldingsDate');
+    if (!box) return;
+    if (!b || (!b.rate_ratio && !b.credit_ratio && !b.top5)) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    if (b.report_date) dateEl.textContent = '（' + b.report_date + ' 季报）';
+    const rows = [];
+    if (b.rate_ratio != null) rows.push(`<span style="display:inline-block;min-width:140px;">利率债占比：<b>${b.rate_ratio}%</b></span>`);
+    if (b.credit_ratio != null) rows.push(`<span style="display:inline-block;min-width:140px;">信用债占比：<b>${b.credit_ratio}%</b></span>`);
+    if (b.aa_plus_ratio != null) rows.push(`<span style="display:inline-block;min-width:160px;">AA+及以上占比：<b style="color:${b.aa_plus_ratio >= 90 ? '#1a7f37' : (b.aa_plus_ratio >= 70 ? '#9a6700' : '#cf222e')}">${b.aa_plus_ratio}%</b></span>`);
+    if (b.scale != null) rows.push(`<span style="display:inline-block;min-width:100px;">规模：<b>${b.scale}亿</b></span>`);
+    if (b.leverage != null) rows.push(`<span style="display:inline-block;min-width:100px;">杠杆：<b>${b.leverage}x</b></span>`);
+    let html = rows.join('<br>') + '<br>';
+    if (b.top5 && b.top5.length) {
+        html += `<div style="margin-top:6px;">前五大重仓：${b.top5.map((x, i) => `<span style="margin-right:12px;">${i + 1}. ${x}</span>`).join('')}</div>`;
+    }
+    div.innerHTML = html;
+}
+
+// 导出当前体检卡输入为 bonds.json 片段（供用户保存到 data/bonds.json）
+function exportCurrentBond() {
+    const nameRaw = document.getElementById('diagName').value.trim();
+    if (!nameRaw) { alert('请先填写基金名称/代码'); return; }
+    // 拆分名称和代码：最后一个6位数字视为代码
+    const m = nameRaw.match(/(\d{6})/);
+    const code = m ? m[1] : nameRaw;
+    const name = m ? nameRaw.replace(/\d{6}/, '').trim() : nameRaw;
+    const bond = {
+        name: name || code,
+        duration: document.getElementById('diagDuration').value,
+        credit: document.getElementById('diagCredit').value
+    };
+    // 定量字段从扩展输入框读（如果有）
+    const getNum = id => { const el = document.getElementById(id); return el && el.value ? parseFloat(el.value) : null; };
+    bond.rate_ratio = getNum('diagRateRatio');
+    bond.credit_ratio = getNum('diagCreditRatio');
+    bond.aa_plus_ratio = getNum('diagAaPlusRatio');
+    bond.scale = getNum('diagScale');
+    bond.leverage = getNum('diagLeverage');
+    const top5El = document.getElementById('diagTop5');
+    if (top5El && top5El.value.trim()) bond.top5 = top5El.value.split(/[,，、\n]/).map(s => s.trim()).filter(Boolean).slice(0, 5);
+    bond.report_date = document.getElementById('diagReportDate') ? document.getElementById('diagReportDate').value : '';
+
+    // 输出 JSON 供用户保存
+    const out = { updated_at: new Date().toISOString().slice(0, 19) + '+08:00', source: 'manual_screenshot', bonds: {} };
+    out.bonds[code] = bond;
+    const text = JSON.stringify(out, null, 2);
+    // 合并已有数据
+    if (BONDS_DATA && BONDS_DATA.bonds) {
+        const merged = JSON.parse(JSON.stringify(BONDS_DATA));
+        merged.bonds[code] = bond;
+        merged.updated_at = out.updated_at;
+        const fullText = JSON.stringify(merged, null, 2);
+        const blob = new Blob([fullText], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'bonds.json';
+        a.click();
+        alert('已导出 bonds.json（含全部已保存债基）。\\n下一步：把文件放到 data/bonds.json，push 上线即可自动加载。');
+    } else {
+        const blob = new Blob([text], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'bonds.json';
+        a.click();
+        alert('已导出 bonds.json（仅当前债基）。\\n下一步：把文件放到 data/bonds.json，push 上线即可自动加载。');
     }
 }
 
@@ -1107,8 +1266,7 @@ function renderCurveTable() {
     strat.innerHTML = '<strong>形态策略：</strong>' + strategy;
 }
 
-/* ===================== 利率周期图表 ===================== */
-// 静态基准：2002–2025 中国国债收益率年度均值（%）
+/* ===================== 静态基准：2002–2025 年度均值（20年分位池） ===================== */
 // 来源：Wind/Choice 口径，招商/华泰/粤开/方正等多家研报交叉整理（年末点位与年均混合，取近似中点）
 // 2022-09 起由新浪日频补全（动态）。早期1Y为近似，已在注释标明。
 const RATES_STATIC = {
@@ -1133,13 +1291,32 @@ function runDiagnosis() {
     const risk = document.getElementById('diagRisk').value;
     const sig = calcSignals();
 
+    // 定量字段（可选）
+    const getNum = id => { const el = document.getElementById(id); const v = el && el.value ? parseFloat(el.value) : null; return (v != null && !isNaN(v)) ? v : null; };
+    const rateRatio = getNum('diagRateRatio');
+    const creditRatio = getNum('diagCreditRatio');
+    const aaPlus = getNum('diagAaPlusRatio');
+    const scale = getNum('diagScale');
+    const leverage = getNum('diagLeverage');
+
     const reasons = [];
     let score = 0;   // 正向=可买，负向=不可买
 
-    // 信用维度（决定性）
-    if (credit === 'low') { score -= 3; reasons.push('⚠️ 含低评级/高收益债：存在信用型真亏风险，本金可能永久损失。'); }
-    else if (credit === 'mid') { score += 1; reasons.push('✓ 中高等级信用债：信用可控，票息略高于利率债。'); }
+    // 信用维度（决定性）—— 定量优先，定性降级
+    if (aaPlus != null) {
+        // 有 AA+ 占比：用真实数据判断
+        if (aaPlus >= 90) { score += 2; reasons.push(`✓ AA+及以上占 ${aaPlus}%：信用安全垫厚，近似无信用风险。`); }
+        else if (aaPlus >= 70) { score += 1; reasons.push(`• AA+及以上占 ${aaPlus}%：信用可控但有下沉，票息略高。`); }
+        else { score -= 2; reasons.push(`⚠️ AA+及以上仅占 ${aaPlus}%：信用下沉明显，经济下行时利差走阔风险大。`); }
+    } else if (credit === 'low') { score -= 3; reasons.push('⚠️ 含低评级/高收益债：存在信用型真亏风险，本金可能永久损失。'); }
+    else if (credit === 'mid') { score += 1; reasons.push('• 中高等级信用债：信用可控，票息略高于利率债。'); }
     else { score += 2; reasons.push('✓ 利率债/高等级：近似无信用风险。'); }
+
+    // 信用结构补充（利率债 vs 信用债占比）
+    if (rateRatio != null && creditRatio != null) {
+        if (rateRatio >= 70) reasons.push(`✓ 利率债占 ${rateRatio}%：主仓无风险，波动来源单一(久期)。`);
+        else if (creditRatio >= 50) reasons.push(`• 信用债占 ${creditRatio}%：收益靠信用利差，需关注信用周期。`);
+    }
 
     // 久期 vs 周期匹配
     const easing = (sig.s1.indexOf('降息') >= 0) || (sig.s2.indexOf('宽松') >= 0);
@@ -1164,6 +1341,18 @@ function runDiagnosis() {
         score -= 1; reasons.push(`⚠️ 预估最大回撤约${estDrawdown}%，超出你的风险承受(${riskTxt})。`);
     } else {
         reasons.push(`✓ 预估回撤约${estDrawdown}% ≤ 你的承受(${riskTxt})。`);
+    }
+
+    // 规模与杠杆（流动性风险，定量）
+    if (scale != null) {
+        if (scale < 2) { score -= 2; reasons.push(`⚠️ 规模仅 ${scale}亿：<2亿有清盘风险，大额赎回时净值冲击大。`); }
+        else if (scale < 10) { score -= 1; reasons.push(`• 规模 ${scale}亿：偏小，赎回冲击需留意。`); }
+        else { reasons.push(`✓ 规模 ${scale}亿：流动性安全。`); }
+    }
+    if (leverage != null) {
+        if (leverage > 1.4) { score -= 1; reasons.push(`⚠️ 杠杆 ${leverage}x：偏高，利率上行时放大跌价。`); }
+        else if (leverage > 1.2) { reasons.push(`• 杠杆 ${leverage}x：中等，正常套息操作。`); }
+        else { reasons.push(`✓ 杠杆 ${leverage}x：低/无杠杆，稳健。`); }
     }
 
     // 曲线形态补充
