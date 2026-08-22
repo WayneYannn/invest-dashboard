@@ -356,6 +356,32 @@
                 <div style="font-size:11px;color:#999;margin-top:4px;">🟢 绿=利差高位(便宜可加) · 🔴 红=利差低位(贵需谨慎) · 数据来源：中债登官方曲线+国泰海通研报(近3年分位)。月度更新，非实时。</div>
             </div>
 
+            <!-- ============ 经济周期数据表 ============ -->
+            <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div style="font-weight:600;font-size:14px;color:#333;">🌐 经济周期数据表</div>
+                    <span id="macroDate" style="font-size:11px;color:#999;"></span>
+                </div>
+                <div style="font-size:11px;color:#999;margin-bottom:8px;">PMI&gt;50=扩张，&lt;50=收缩；CPI同比低位=通胀温和利好债市；PPI反映工业品价格。月度数据，做大面判断用。</div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f6f8fa;">
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">指标</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">最新值</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">上月</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近6月均值</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">荣枯线/参照</th>
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">含义</th>
+                        </tr>
+                    </thead>
+                    <tbody id="macroBody">
+                        <tr><td colspan="6" style="padding:8px;color:#999;text-align:center;">加载中…</td></tr>
+                    </tbody>
+                </table>
+                <div id="macroJudge" style="margin-top:8px;padding:10px 12px;background:#f6f8fa;border-radius:4px;font-size:12px;color:#555;line-height:1.7;">经济周期判断：加载中…</div>
+                <div style="font-size:11px;color:#999;margin-top:4px;">数据来源：东方财富宏观经济数据中心（PMI/CPI/PPI）。月度更新。PMI荣枯线50，CPI同比3%为通胀警戒线。</div>
+            </div>
+
             <div class="sources">
                 <strong>数据来源：</strong><br>
                 国债收益率：<a href="https://data.eastmoney.com/cjsj/zmgpjyl.html" target="_blank">东方财富-中美国债收益率</a>、新浪债券频道（自动抓取）
@@ -703,6 +729,103 @@ async function loadAuto() {
     // 加载已保存的债基穿透数据（可选，失败不阻塞）
     loadBonds();
     loadCreditSpreads();
+    loadMacro();
+}
+
+/* ===================== 经济周期数据加载（data/macro.json） ===================== */
+let MACRO_DATA = null;
+
+async function loadMacro() {
+    const body = document.getElementById('macroBody');
+    const judge = document.getElementById('macroJudge');
+    try {
+        const res = await fetch('data/macro.json?t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        MACRO_DATA = await res.json();
+        renderMacro();
+    } catch (e) {
+        MACRO_DATA = null;
+        if (body) body.innerHTML = '<tr><td colspan="6" style="padding:8px;color:#999;text-align:center;">宏观经济数据未加载（data/macro.json 不存在）</td></tr>';
+        if (judge) judge.innerHTML = '经济周期判断：数据未加载';
+    }
+}
+
+function renderMacro() {
+    const body = document.getElementById('macroBody');
+    const judge = document.getElementById('macroJudge');
+    const dateEl = document.getElementById('macroDate');
+    if (!body || !MACRO_DATA) return;
+
+    const cpi = MACRO_DATA.cpi || [], ppi = MACRO_DATA.ppi || [], pmi = MACRO_DATA.mgi || (MACRO_DATA.pmi || []);
+    if (dateEl && cpi[0]) dateEl.textContent = '数据日期：' + (cpi[0].label || cpi[0].date);
+
+    const avg6 = arr => arr.slice(0, 6).map(x => x.yoy).filter(v => v != null);
+    const avgPmi6 = () => pmi.slice(0, 6).map(x => x.mfg).filter(v => v != null);
+    const mean = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : '—';
+
+    const td = (html, extra) => `<td style="padding:7px 8px;border:1px solid #e3e3e3;text-align:center;${extra || ''}">${html}</td>`;
+    // PMI：>50绿(扩张利好)，<50红(收缩)
+    const pmiBg = v => v == null ? '' : (v >= 50 ? 'background:#e6ffec;font-weight:600;' : 'background:#ffebe9;font-weight:600;');
+    // CPI：低位(<2)绿(利好债市)，高位(>3)红
+    const cpiBg = v => v == null ? '' : (v <= 2 ? 'background:#e6ffec;font-weight:600;' : (v >= 3 ? 'background:#ffebe9;font-weight:600;': ''));
+
+    const cpiCur = cpi[0] || {}, cpiPrev = cpi[1] || {};
+    const ppiCur = ppi[0] || {}, ppiPrev = ppi[1] || {};
+    const pmiCur = pmi[0] || {}, pmiPrev = pmi[1] || {};
+
+    body.innerHTML =
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>制造业PMI</b></td>` +
+        td(`<b>${pmiCur.mfg != null ? pmiCur.mfg : '—'}</b>`, pmiBg(pmiCur.mfg)) +
+        td(pmiPrev.mfg != null ? pmiPrev.mfg : '—') +
+        td(mean(avgPmi6())) +
+        td('50') +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;font-size:12px;color:#666;">${pmiCur.mfg >= 50 ? '扩张（经济向好）' : '收缩（经济偏弱·利好债市）'}</td>` +
+        `</tr>` +
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>CPI 同比</b></td>` +
+        td(`<b>${cpiCur.yoy != null ? cpiCur.yoy + '%' : '—'}</b>`, cpiBg(cpiCur.yoy)) +
+        td(cpiPrev.yoy != null ? cpiPrev.yoy + '%' : '—') +
+        td(mean(avg6(cpi)) + '%') +
+        td('3%警戒') +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;font-size:12px;color:#666;">${cpiCur.yoy <= 2 ? '通胀温和（利好债市）' : (cpiCur.yoy >= 3 ? '通胀偏高（压制债市）' : '正常')}</td>` +
+        `</tr>` +
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>PPI 同比</b></td>` +
+        td(`<b>${ppiCur.yoy != null ? ppiCur.yoy + '%' : '—'}</b>`) +
+        td(ppiPrev.yoy != null ? ppiPrev.yoy + '%' : '—') +
+        td(mean(avg6(ppi)) + '%') +
+        td('0') +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;font-size:12px;color:#666;">${ppiCur.yoy > 0 ? '工业品涨价（PPI为正）' : '工业品降价（通缩压力）'}</td>` +
+        `</tr>`;
+
+    // 经济周期判断
+    const pmiVal = pmiCur.mfg, cpiVal = cpiCur.yoy;
+    let summary = '', bondImplication = '';
+    if (pmiVal != null && cpiVal != null) {
+        if (pmiVal < 50 && cpiVal <= 2) {
+            summary = '经济收缩 + 通胀温和（类衰退特征）';
+            bondImplication = '利好债市：经济弱+通胀低→货币易宽松→利率下行→债基受益。典型债牛环境。';
+        } else if (pmiVal >= 50 && cpiVal <= 2) {
+            summary = '经济扩张 + 通胀温和（金发女孩经济）';
+            bondImplication = '中性偏利好：经济温和复苏但通胀可控，债市不差，但利率下行空间有限。';
+        } else if (pmiVal < 50 && cpiVal > 3) {
+            summary = '经济收缩 + 通胀偏高（滞胀特征）';
+            bondImplication = '不利债市：经济差但通胀高，央行难宽松，债市承压。';
+        } else if (pmiVal >= 50 && cpiVal > 3) {
+            summary = '经济扩张 + 通胀偏高（过热特征）';
+            bondImplication = '不利债市：经济好+通胀高→央行可能收紧→利率上行→债基承压。';
+        } else {
+            summary = '经济与通胀信号混合，方向不明';
+            bondImplication = '中性：多信号不一致，维持均衡配置，待趋势明朗。';
+        }
+    } else {
+        summary = '数据不足，无法判断';
+        bondImplication = '请补全PMI/CPI数据。';
+    }
+    judge.innerHTML =
+        `<strong>📊 经济周期判断：</strong>${summary}<br>` +
+        `<strong>📌 对债市含义：</strong>${bondImplication}`;
 }
 
 /* ===================== 信用利差数据加载（data/credit_spreads.json） ===================== */
