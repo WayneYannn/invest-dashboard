@@ -129,7 +129,7 @@
 
     <div class="data-bar" id="dataBar">
         <span class="upd" id="updTime">自动数据加载中…</span>
-        <span class="upd" style="color:#999;">页面版本 v2026.08.22-4</span>
+        <span class="upd" style="color:#999;">页面版本 v2026.08.22-5</span>
         <span class="legend"><b class="auto">● 自动</b> 基金净值 / 金价　<b class="manual">● 手动</b> PB分位 / 股息率 / 国债收益率 / 仓位</span>
         <span class="tools">
             <button onclick="exportManual()">导出手动值</button>
@@ -1318,19 +1318,58 @@ function runDiagnosis() {
         else if (creditRatio >= 50) reasons.push(`• 信用债占 ${creditRatio}%：收益靠信用利差，需关注信用周期。`);
     }
 
-    // 久期 vs 周期匹配
+    // === 债基类型判定 → 分支路由（核心改造） ===
+    // 利率债主导(rateRatio>=50) → 利率周期逻辑；信用债主导(creditRatio>50) → 信用周期逻辑
+    let bondType = 'unknown';   // rate / credit / unknown
+    if (rateRatio != null && creditRatio != null) {
+        if (rateRatio >= 50) bondType = 'rate';
+        else if (creditRatio > 50) bondType = 'credit';
+    } else {
+        // 无定量数据，按 credit 下拉框降级推断
+        if (credit === 'rate') bondType = 'rate';
+        else if (credit === 'mid' || credit === 'low') bondType = 'credit';
+    }
+
+    // 银行二级资本债重仓识别（特殊条款风险）
+    const top5Str = (document.getElementById('diagTop5') && document.getElementById('diagTop5').value) || '';
+    const hasBankTier2 = /二级资本债|银行二级|TLAC|永续债/.test(top5Str);
+
+    if (bondType === 'credit') {
+        // === 信用债主导型：走信用周期逻辑 ===
+        reasons.push('📊 判定：信用债主导型 → 核心风险是信用利差+流动性，不能只用利率周期判断。');
+        // 信用利差数据缺口提示（当前看板未接入信用利差走势）
+        reasons.push('⚠️ 数据缺口：当前看板未接入信用利差(AA+/AA vs 国债)走势。信用债贵不贵、该不该加，需结合信用利差历史分位判断——利差高位=便宜可加，低位=贵需谨慎。');
+        // 银行二级资本债特殊提示
+        if (hasBankTier2) {
+            reasons.push('⚠️ 重仓银行二级资本债：主体评级AAA但含减记条款（银行触发条件时本金可减记），非纯无风险资产。对银行体系信用事件+流动性冲击敏感（参考2022赎回潮）。');
+        }
+        // 信用债 + 杠杆 = 放大流动性风险
+        if (leverage != null && leverage > 1.2) {
+            reasons.push(`⚠️ 信用债+杠杆${leverage}x：流动性冲击时放大回撤。关注DR007资金面，套息空间=信用债收益率−DR007，为负时杠杆亏钱。`);
+        }
+        // 利率周期对信用债只对一半：利率下行利好，但若利差走阔可能不涨反跌
+        reasons.push('• 利率周期对信用债只对一半：利率下行利好信用债，但若同时信用利差走阔，信用债可能不涨反跌。需利率+信用双周期同向才最佳。');
+    } else if (bondType === 'rate') {
+        // === 利率债主导型：走利率周期逻辑（原逻辑保留） ===
+        reasons.push('📊 判定：利率债主导型 → 核心风险是利率周期(久期)，用S1-S4信号判断。');
+    } else {
+        reasons.push('📊 债基类型未定（缺利率债/信用债占比）：判断方向可能偏，建议补定量穿透数据。');
+    }
+
+    // 久期 vs 周期匹配（信用债主导型时，利率周期信号权重减半，仅作参考）
     const easing = (sig.s1.indexOf('降息') >= 0) || (sig.s2.indexOf('宽松') >= 0);
     const tightening = (sig.s1.indexOf('加息') >= 0) || (sig.s2.indexOf('收紧') >= 0);
+    const durWeight = bondType === 'credit' ? 0.5 : 1;   // 信用债主导型久期信号权重减半
     if (dur === 'long') {
-        if (easing) { score += 2; reasons.push('✓ 长久期 + 当前宽松/降息信号：资本利得顺风。'); }
-        else if (tightening) { score -= 2; reasons.push('⚠️ 长久期 + 当前收紧/加息信号：久期放大跌价，逆风。'); }
+        if (easing) { score += 2 * durWeight; reasons.push(`${bondType === 'credit' ? '•' : '✓'} 长久期 + 宽松/降息信号：资本利得顺风${bondType === 'credit' ? '（信用债主导型，利率信号仅参考，需信用利差确认）' : ''}。`); }
+        else if (tightening) { score -= 2 * durWeight; reasons.push(`${bondType === 'credit' ? '•' : '⚠️'} 长久期 + 收紧/加息信号：久期放大跌价${bondType === 'credit' ? '（信用债主导型，利率信号权重减半）' : '，逆风'}.`); }
         else { reasons.push('• 长久期 + 震荡：票息为主，波动中性。'); }
     } else if (dur === 'short') {
-        if (tightening) { score += 2; reasons.push('✓ 短久期 + 当前收紧：抗跌，靠票息+快到期托底。'); }
+        if (tightening) { score += 2 * durWeight; reasons.push(`${bondType === 'credit' ? '•' : '✓'} 短久期 + 收紧：抗跌${bondType === 'credit' ? '（信用债主导型，利率信号仅参考）' : '，靠票息+快到期托底'}.`); }
         else if (easing) { reasons.push('• 短久期 + 宽松：稳健但错过部分涨价收益。'); }
-        else { score += 1; reasons.push('✓ 短久期 + 震荡：防御稳健。'); }
+        else { score += 1 * durWeight; reasons.push('✓ 短久期 + 震荡：防御稳健。'); }
     } else {
-        reasons.push('• 中久期：攻守平衡，匹配多数环境。'); score += 1;
+        reasons.push('• 中久期：攻守平衡，匹配多数环境。'); score += 1 * durWeight;
     }
 
     // 风险承受匹配
@@ -1357,6 +1396,12 @@ function runDiagnosis() {
 
     // 曲线形态补充
     if (sig.s3.indexOf('倒挂') >= 0) { reasons.push('⚠️ 曲线倒挂：衰退预警，建议降久期/信用暴露。'); score -= 1; }
+
+    // 信用债主导型：因信用利差数据缺口，结论上限封顶在"谨慎"（不能给可买，除非数据补全）
+    if (bondType === 'credit' && score >= 3) {
+        score = 2;   // 封顶到谨慎区间
+        reasons.push('⚠️ 结论上限封顶：信用债主导型但因缺信用利差数据，最高判"谨慎"。补入信用利差走势后可解除封顶。');
+    }
 
     // 结论
     let verdict, cls;
