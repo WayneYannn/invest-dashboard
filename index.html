@@ -129,7 +129,7 @@
 
     <div class="data-bar" id="dataBar">
         <span class="upd" id="updTime">自动数据加载中…</span>
-        <span class="upd" style="color:#999;">页面版本 v2026.08.22-2</span>
+        <span class="upd" style="color:#999;">页面版本 v2026.08.22-3</span>
         <span class="legend"><b class="auto">● 自动</b> 基金净值 / 金价　<b class="manual">● 手动</b> PB分位 / 股息率 / 国债收益率 / 仓位</span>
         <span class="tools">
             <button onclick="exportManual()">导出手动值</button>
@@ -239,6 +239,15 @@
 
             <div class="indicator-row">
                 <div class="left">
+                    <div class="label">2年期国债收益率 <span class="auto-tag">手动</span></div>
+                    <div class="desc">中端利率，看曲线中段性价比</div>
+                </div>
+                <input type="number" id="bondYield2" value="1.25" step="0.01" onchange="saveManual();calcBond()">
+                <div class="meaning" id="yield2Meaning">—</div>
+            </div>
+
+            <div class="indicator-row">
+                <div class="left">
                     <div class="label">期限利差（10Y - 1Y） <span class="auto-tag">手动</span></div>
                     <div class="desc">&gt;0.5% 陡峭，0.2-0.5% 正常，&lt;0.2% 扁平</div>
                 </div>
@@ -281,44 +290,43 @@
                         <tr style="background:#f6f8fa;">
                             <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">指标</th>
                             <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">当前值</th>
-                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近期趋势</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近3月变化</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近1年趋势</th>
                             <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近1年区间</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近1年均值</th>
                             <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">20年分位</th>
                             <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">状态</th>
                         </tr>
                     </thead>
                     <tbody id="rateKeyBody">
-                        <tr><td colspan="6" style="padding:8px;color:#999;text-align:center;">加载中…</td></tr>
+                        <tr><td colspan="8" style="padding:8px;color:#999;text-align:center;">加载中…</td></tr>
                     </tbody>
                 </table>
                 <div style="font-size:11px;color:#999;margin-top:4px;">🟢 绿=低位/下行（利好债基）· 🔴 红=高位/上行（压制债基）· 无色=中性。区间与趋势基于自动抓取的日频历史。</div>
             </div>
 
-            <!-- ============ 利率周期图表 ============ -->
+            <!-- ============ 收益率曲线形态表 ============ -->
             <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <div style="font-weight:600;font-size:14px;color:#333;">📈 利率周期走势（国债收益率 %）</div>
-                    <div style="font-size:11px;color:#999;">纵轴=收益率(%) · 横轴=时间</div>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="rateWindowBtns">
-                    <button class="win-btn" data-win="all" onclick="drawRateChart('all')">全部(20Y+)</button>
-                    <button class="win-btn" data-win="10y" onclick="drawRateChart('10y')">近10年</button>
-                    <button class="win-btn" data-win="5y" onclick="drawRateChart('5y')">近5年</button>
-                    <button class="win-btn active" data-win="3y" onclick="drawRateChart('3y')">近3年</button>
-                    <button class="win-btn" data-win="1y" onclick="drawRateChart('1y')">近1年</button>
-                    <button class="win-btn" data-win="6m" onclick="drawRateChart('6m')">近半年</button>
-                    <button class="win-btn" data-win="3m" onclick="drawRateChart('3m')">近3月</button>
-                    <button class="win-btn" data-win="1m" onclick="drawRateChart('1m')">近1月</button>
-                </div>
-                <div style="display:flex;gap:14px;font-size:11px;margin-bottom:6px;">
-                    <label style="color:#c0392b;"><input type="checkbox" id="show10y" checked onchange="redrawRateChart()"> 10Y（长端）</label>
-                    <label style="color:#2980b9;"><input type="checkbox" id="show1y" checked onchange="redrawRateChart()"> 1Y（短端）</label>
-                    <label style="color:#7f8c8d;"><input type="checkbox" id="showSpread" onchange="redrawRateChart()"> 利差(10Y-1Y)</label>
-                </div>
-                <canvas id="rateChart" style="display:block;width:100% !important;height:320px !important;"></canvas>
-                <div style="font-size:11px;color:#999;margin-top:4px;">
-                    静态基准：2002–2025 年度均值（Wind/Choice 口径，多家研报交叉）；动态：新浪日频自动抓取（2022-09 起）。数据为历史事实整理，非实时预测。
-                </div>
+                <div style="font-weight:600;font-size:14px;color:#333;margin-bottom:4px;">📐 收益率曲线形态</div>
+                <div style="font-size:11px;color:#999;margin-bottom:8px;">横轴=借多久 · 纵轴=收益率%。长端高于短端=正常陡峭；两端接近=平坦；短端反超=倒挂（衰退预警）。</div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f6f8fa;">
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">利差段</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">含义</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">当前利差</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">1年前</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近1年区间</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近1年分位</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">形态判定</th>
+                        </tr>
+                    </thead>
+                    <tbody id="curveShapeBody">
+                        <tr><td colspan="7" style="padding:8px;color:#999;text-align:center;">加载中…</td></tr>
+                    </tbody>
+                </table>
+                <div id="curveStrategy" style="margin-top:8px;padding:8px 10px;background:#f6f8fa;border-radius:4px;font-size:12px;color:#555;">形态策略：加载中…</div>
+                <div style="font-size:11px;color:#999;margin-top:4px;">陡峭→哑铃（长短两端·中段少配）· 平坦→子弹（集中中段吃骑乘）· 倒挂→防御（缩久期转短债）。分位越高越陡。</div>
             </div>
 
             <div class="sources">
@@ -617,7 +625,7 @@
 /* ===================== 自动数据加载 ===================== */
 const MANUAL_KEY = 'invest_dashboard_manual_v1';
 const MANUAL_IDS = ['goldRatio','gold1yReturn','goldMaDev','goldRsi',
-    'bondYield10','bondYield1','termSpread',
+    'bondYield10','bondYield2','bondYield1','termSpread',
     'pbPct','divYield','pePct','riskPremium'];
 
 async function loadAuto() {
@@ -711,10 +719,11 @@ let RATE_SOURCE = 'manual';           // 'auto' / 'manual'
 function applyRates(rates) {
     const srcEl = document.getElementById('rateSourceTag');
     if (rates && rates.source && rates.source !== 'manual_required'
-        && (rates.y10 != null || rates.y1 != null || rates.cpi != null || rates.mlf != null)) {
+        && (rates.y10 != null || rates.y2 != null || rates.y1 != null || rates.cpi != null || rates.mlf != null)) {
         RATE_SOURCE = 'auto';
         let fieldsNote = [];
         if (rates.y10 != null) { document.getElementById('bondYield10').value = rates.y10.toFixed(2); markAuto('bondYield10'); fieldsNote.push('10Y'); }
+        if (rates.y2 != null)  { document.getElementById('bondYield2').value  = rates.y2.toFixed(2);  markAuto('bondYield2');  fieldsNote.push('2Y'); }
         if (rates.y1 != null)  { document.getElementById('bondYield1').value  = rates.y1.toFixed(2);  markAuto('bondYield1');  fieldsNote.push('1Y'); }
         // 期限利差用 10Y-1Y（自动源给出 y1，更贴合该框定义）
         if (rates.y10 != null && rates.y1 != null) {
@@ -723,16 +732,20 @@ function applyRates(rates) {
             fieldsNote.push('利差');
         }
         if (srcEl) srcEl.innerHTML = '<span class="auto-tag">自动 · ' + rates.source + '</span>';
-        // 保存新浪动态序列供图表使用
-        if (rates.history_10y || rates.history_1y) {
-            window.AUTO_RATES = { history_10y: rates.history_10y || {}, history_1y: rates.history_1y || {} };
+        // 保存新浪动态序列供数据表使用
+        if (rates.history_10y || rates.history_2y || rates.history_1y) {
+            window.AUTO_RATES = {
+                history_10y: rates.history_10y || {},
+                history_2y:  rates.history_2y  || {},
+                history_1y:  rates.history_1y  || {}
+            };
         }
     } else {
         RATE_SOURCE = 'manual';
         if (srcEl) srcEl.innerHTML = '<span style="color:#cf222e;font-size:11px;font-weight:600;">手动 · 自动源不可用，请自行录入</span>';
     }
     calcBond();            // 内部会触发 renderCycleSignals()
-    drawRateChart('3y');   // 默认绘制近3年
+    renderCurveTable();    // 曲线形态表
 }
 function markAuto(id) {
     const el = document.getElementById(id);
@@ -760,9 +773,17 @@ function calcSignals() {
     const y10 = parseFloat(document.getElementById('bondYield10').value) || 0;
     const y1 = parseFloat(document.getElementById('bondYield1').value) || 0;
     const spread = parseFloat(document.getElementById('termSpread').value) || 0;
+    // 2Y 中端：输入框优先，无则从自动序列取最新值
+    const y2Input = parseFloat(document.getElementById('bondYield2') && document.getElementById('bondYield2').value) || 0;
+    let y2 = y2Input;
+    if (!y2 && window.AUTO_RATES && AUTO_RATES.history_2y) {
+        const arr = Object.entries(AUTO_RATES.history_2y).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        if (arr.length) y2 = arr[arr.length - 1][1];
+    }
 
     // 历史序列（新浪日频，约4年，自动抓取时可用）
     const h10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? Object.entries(AUTO_RATES.history_10y) : [];
+    const h2  = (window.AUTO_RATES && AUTO_RATES.history_2y)  ? Object.entries(AUTO_RATES.history_2y)  : [];
     const h1  = (window.AUTO_RATES && AUTO_RATES.history_1y) ? Object.entries(AUTO_RATES.history_1y) : [];
 
     let pct = null, trend10 = null, trend1 = null, spreadMed = null;
@@ -827,14 +848,14 @@ function calcSignals() {
     else if (real > 1) s4 = '收紧（实际利率≈' + real.toFixed(2) + '%偏高·CPI按默认2%）';
     else s4 = '中性（实际利率≈' + real.toFixed(2) + '%·CPI按默认2%）';
 
-    return { y10, y1, spread, pct, trend10, trend1, spreadMed, s1, s2, s3, s4, hasHist };
+    return { y10, y2, y1, spread, pct, trend10, trend1, spreadMed, s1, s2, s3, s4, hasHist };
 }
 function renderCycleSignals() {
     const sig = calcSignals();
     const box = document.getElementById('diagCycleSignals');
     if (box) {
         box.innerHTML =
-            `当前10Y=${sig.y10.toFixed(2)}%　1Y=${sig.y1.toFixed(2)}%　利差=${sig.spread.toFixed(2)}%<br>` +
+            `当前10Y=${sig.y10.toFixed(2)}%　2Y=${sig.y2 ? sig.y2.toFixed(2) : '—'}%　1Y=${sig.y1.toFixed(2)}%　利差=${sig.spread.toFixed(2)}%<br>` +
             `S1 相对位置：${sig.s1}<br>` +
             `S2 政策意图：${sig.s2}<br>` +
             `S3 曲线形态：${sig.s3}<br>` +
@@ -866,6 +887,7 @@ function renderCycleSignals() {
         envEl.innerHTML = `<strong>环境判断：${sig.s1} · ${sig.s3}</strong><br>多信号并列见下方「周期信号清单」，综合判断权在你。`;
     }
     renderRateTable(sig);
+    renderCurveTable();
 }
 
 /* ===================== 关键利率数据表 ===================== */
@@ -875,58 +897,214 @@ function renderRateTable(sig) {
     if (!sig) sig = calcSignals();
 
     const h10e = (window.AUTO_RATES && AUTO_RATES.history_10y) ? Object.entries(AUTO_RATES.history_10y) : [];
+    const h2e  = (window.AUTO_RATES && AUTO_RATES.history_2y)  ? Object.entries(AUTO_RATES.history_2y)  : [];
     const h1e  = (window.AUTO_RATES && AUTO_RATES.history_1y)  ? Object.entries(AUTO_RATES.history_1y)  : [];
     const yearAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-    const w10 = h10e.filter(p => p[0] >= yearAgo).map(p => p[1]);
-    const w1  = h1e.filter(p => p[0] >= yearAgo).map(p => p[1]);
-    const rng10 = w10.length ? Math.min(...w10).toFixed(2) + '–' + Math.max(...w10).toFixed(2) + '%' : '—';
-    const rng1  = w1.length  ? Math.min(...w1).toFixed(2)  + '–' + Math.max(...w1).toFixed(2)  + '%' : '—';
 
-    // 1Y 的 20 年分位池（静态年度 + 日频）
-    let pct1 = null;
-    if (h1e.length > 200) {
-        const pool1 = h1e.map(p => p[1]).concat(Object.values(RATES_STATIC.y1));
-        pct1 = Math.round(pool1.filter(v => v <= sig.y1).length / pool1.length * 100);
-    }
+    // 近1年区间 + 均值（中位）
+    const winStat = (arr) => {
+        const w = arr.filter(p => p[0] >= yearAgo).map(p => p[1]);
+        if (!w.length) return { rng: '—', med: '—' };
+        const s = [...w].sort((a, b) => a - b);
+        return {
+            rng: Math.min(...w).toFixed(2) + '–' + Math.max(...w).toFixed(2) + '%',
+            med: s[Math.floor(s.length / 2)].toFixed(2) + '%'
+        };
+    };
+    const s10 = winStat(h10e), s2 = winStat(h2e), s1 = winStat(h1e);
+
+    // 近3月变化：3个月前值 vs 现值（负=下行利好债基）
+    const chg3m = (arr) => {
+        if (arr.length < 2) return null;
+        const sorted = [...arr].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        const last = sorted[sorted.length - 1];
+        const cut = new Date(new Date(last[0] + 'T00:00:00+08:00').getTime() - 90 * 86400000).toISOString().slice(0, 10);
+        const old = sorted.find(p => p[0] >= cut);
+        if (!old) return null;
+        return +(last[1] - old[1]).toFixed(3);
+    };
+    const c10 = chg3m(h10e), c2 = chg3m(h2e), c1 = chg3m(h1e);
+    const fmtChg = (c) => c == null ? '—' : (c > 0 ? '+' : '') + c.toFixed(2) + '%';
+
+    // 20 年分位池（静态年度 + 日频）；2Y 无静态基准，只用日频近4年算"近4年分位"
+    const pct20 = (arr, staticMap, cur) => {
+        if (arr.length > 200) {
+            const pool = arr.map(p => p[1]).concat(staticMap ? Object.values(staticMap) : []);
+            return Math.round(pool.filter(v => v <= cur).length / pool.length * 100);
+        }
+        return null;
+    };
+    const p10 = sig.pct;
+    const p2  = h2e.length > 200 ? Math.round(h2e.map(p => p[1]).filter(v => v <= sig.y2).length / h2e.length * 100) : null;
+    const p1  = pct20(h1e, RATES_STATIC.y1, sig.y1);
 
     const td = (html, extra) => `<td style="padding:7px 8px;border:1px solid #e3e3e3;text-align:center;${extra || ''}">${html}</td>`;
-    const lowBg  = 'background:#e6ffec;font-weight:600;';
-    const highBg = 'background:#ffebe9;font-weight:600;';
+    const lowBg  = 'background:#e6ffec;font-weight:600;';   // 绿=低位/下行利好
+    const highBg = 'background:#ffebe9;font-weight:600;';   // 红=高位/上行压制
 
     // 状态与高亮
-    const st10 = sig.pct == null ? '—' : (sig.pct <= 20 ? '低位' : (sig.pct >= 80 ? '高位' : '中位'));
-    const st1  = pct1 == null ? '—' : (pct1 <= 20 ? '低位' : (pct1 >= 80 ? '高位' : '中位'));
+    const st = (p) => p == null ? '—' : (p <= 20 ? '低位' : (p >= 80 ? '高位' : '中位'));
+    const st10 = st(p10), st2 = st(p2), st1 = st(p1);
     const stSp = sig.spreadMed == null ? '—'
         : (sig.spread < sig.spreadMed - 0.15 ? '偏防御' : (sig.spread > sig.spreadMed + 0.15 ? '偏进攻' : '≈中位'));
 
     const pctBg = (p) => p == null ? '' : (p <= 20 ? lowBg : (p >= 80 ? highBg : ''));
+    const chgBg = (c) => c == null ? '' : (c < 0 ? lowBg : (c > 0 ? highBg : ''));
     const trendBg = (t) => !t ? '' : (t.indexOf('下行') >= 0 ? lowBg : (t.indexOf('上行') >= 0 ? highBg : ''));
 
     body.innerHTML =
         `<tr>` +
         `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b style="color:#c0392b;">10Y 长端</b></td>` +
         td(`<b>${sig.y10.toFixed(2)}%</b>`) +
+        td(fmtChg(c10), chgBg(c10)) +
         td(sig.trend10 || '—', trendBg(sig.trend10)) +
-        td(rng10) +
-        td(sig.pct == null ? '—' : sig.pct + '%', pctBg(sig.pct)) +
-        td(st10, pctBg(sig.pct)) +
+        td(s10.rng) +
+        td(s10.med) +
+        td(p10 == null ? '—' : p10 + '%', pctBg(p10)) +
+        td(st10, pctBg(p10)) +
+        `</tr>` +
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b style="color:#8e44ad;">2Y 中端</b></td>` +
+        td(`<b>${sig.y2.toFixed(2)}%</b>`) +
+        td(fmtChg(c2), chgBg(c2)) +
+        td(_trendOf(h2e, 90) || '—', trendBg(_trendOf(h2e, 90))) +
+        td(s2.rng) +
+        td(s2.med) +
+        td(p2 == null ? '—' : p2 + '%', pctBg(p2)) +
+        td(st2, pctBg(p2)) +
         `</tr>` +
         `<tr>` +
         `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b style="color:#2980b9;">1Y 短端</b></td>` +
         td(`<b>${sig.y1.toFixed(2)}%</b>`) +
+        td(fmtChg(c1), chgBg(c1)) +
         td(sig.trend1 || '—', trendBg(sig.trend1)) +
-        td(rng1) +
-        td(pct1 == null ? '—' : pct1 + '%', pctBg(pct1)) +
-        td(st1, pctBg(pct1)) +
+        td(s1.rng) +
+        td(s1.med) +
+        td(p1 == null ? '—' : p1 + '%', pctBg(p1)) +
+        td(st1, pctBg(p1)) +
         `</tr>` +
         `<tr>` +
         `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b style="color:#7f8c8d;">利差 10Y−1Y</b></td>` +
         td(`<b>${sig.spread.toFixed(2)}%</b>`) +
+        td(fmtChg(c10 != null && c1 != null ? +(c10 - c1).toFixed(2) : null), chgBg(c10 != null && c1 != null ? c10 - c1 : null)) +
         td(sig.spreadMed != null ? '中位 ' + sig.spreadMed.toFixed(2) + '%' : '—') +
+        td('—') +
         td('—') +
         td('—') +
         td(stSp) +
         `</tr>`;
+}
+
+/* ===================== 收益率曲线形态表 ===================== */
+// 用 1Y/2Y/10Y 三点曲线算各段利差、近1年分位、形态判定、对应策略
+function renderCurveTable() {
+    const body = document.getElementById('curveShapeBody');
+    const strat = document.getElementById('curveStrategy');
+    if (!body) return;
+    const sig = calcSignals();
+    const h10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? Object.entries(AUTO_RATES.history_10y) : [];
+    const h2  = (window.AUTO_RATES && AUTO_RATES.history_2y)  ? Object.entries(AUTO_RATES.history_2y)  : [];
+    const h1  = (window.AUTO_RATES && AUTO_RATES.history_1y)  ? Object.entries(AUTO_RATES.history_1y)  : [];
+
+    // 各段当日利差序列（对齐共同日期，近1年窗口）
+    const yearAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    const spreadSeries = (a, b) => {
+        const ma = new Map(a), mb = new Map(b);
+        return [...ma.keys()].filter(d => ma.has(d) && mb.has(d) && d >= yearAgo)
+            .map(d => +(ma.get(d) - mb.get(d)).toFixed(3));
+    };
+    const sp_10_1 = spreadSeries(h10, h1);
+    const sp_10_2 = spreadSeries(h10, h2);
+    const sp_2_1  = spreadSeries(h2, h1);
+
+    const pctOf = (series, cur) => series.length > 50 ? Math.round(series.filter(v => v <= cur).length / series.length * 100) : null;
+    const rngOf = (series) => series.length ? Math.min(...series).toFixed(2) + '–' + Math.max(...series).toFixed(2) + '%' : '—';
+
+    // 1年前利差
+    const valYearAgo = (h, date) => {
+        const s = [...h].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        const idx = s.findIndex(p => p[0] >= date);
+        return idx >= 0 ? s[idx][1] : null;
+    };
+    const ya10 = valYearAgo(h10, yearAgo), ya2 = valYearAgo(h2, yearAgo), ya1 = valYearAgo(h1, yearAgo);
+
+    const cur_10_1 = +(sig.y10 - sig.y1).toFixed(3);
+    const cur_10_2 = +(sig.y10 - sig.y2).toFixed(3);
+    const cur_2_1  = +(sig.y2  - sig.y1).toFixed(3);
+
+    const pct_10_1 = pctOf(sp_10_1, cur_10_1);
+    const pct_10_2 = pctOf(sp_10_2, cur_10_2);
+    const pct_2_1  = pctOf(sp_2_1,  cur_2_1);
+
+    const td = (html, extra) => `<td style="padding:7px 8px;border:1px solid #e3e3e3;text-align:center;${extra || ''}">${html}</td>`;
+    const steepBg = 'background:#fff8e1;font-weight:600;';   // 黄=陡峭
+    const flatBg  = 'background:#e3f2fd;font-weight:600;';   // 蓝=平坦
+    const invertBg = 'background:#ffebe9;font-weight:600;';  // 红=倒挂
+
+    // 形态判定：负值=倒挂；≥80分位=陡峭；≤20=平坦；其余中位
+    const shapeOf = (cur, pct) => {
+        if (cur < 0) return { label: '倒挂', bg: invertBg };
+        if (pct == null) return { label: '—', bg: '' };
+        if (pct >= 80) return { label: '陡峭', bg: steepBg };
+        if (pct <= 20) return { label: '平坦', bg: flatBg };
+        return { label: '中位', bg: '' };
+    };
+    const sh_10_1 = shapeOf(cur_10_1, pct_10_1);
+    const sh_10_2 = shapeOf(cur_10_2, pct_10_2);
+    const sh_2_1  = shapeOf(cur_2_1, pct_2_1);
+
+    const yaChg = (cur, ya) => ya == null ? '—' : (cur >= 0 && ya != null ? (cur >= ya ? '+' : '') + (cur - ya).toFixed(2) + '%' : '—');
+
+    body.innerHTML =
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>2Y−1Y 短端</b></td>` +
+        td('短端资金松紧') +
+        td(`<b>${cur_2_1 >= 0 ? '+' : ''}${cur_2_1.toFixed(2)}%</b>`) +
+        td(ya2 != null && ya1 != null ? (ya2 - ya1).toFixed(2) + '%' : '—') +
+        td(rngOf(sp_2_1)) +
+        td(pct_2_1 == null ? '—' : pct_2_1 + '%') +
+        td(sh_2_1.label, sh_2_1.bg) +
+        `</tr>` +
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>10Y−2Y 中长段</b></td>` +
+        td('中段性价比') +
+        td(`<b>${cur_10_2 >= 0 ? '+' : ''}${cur_10_2.toFixed(2)}%</b>`) +
+        td(ya10 != null && ya2 != null ? (ya10 - ya2).toFixed(2) + '%' : '—') +
+        td(rngOf(sp_10_2)) +
+        td(pct_10_2 == null ? '—' : pct_10_2 + '%') +
+        td(sh_10_2.label, sh_10_2.bg) +
+        `</tr>` +
+        `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>10Y−1Y 全段</b></td>` +
+        td('整体陡峭度') +
+        td(`<b>${cur_10_1 >= 0 ? '+' : ''}${cur_10_1.toFixed(2)}%</b>`) +
+        td(ya10 != null && ya1 != null ? (ya10 - ya1).toFixed(2) + '%' : '—') +
+        td(rngOf(sp_10_1)) +
+        td(pct_10_1 == null ? '—' : pct_10_1 + '%') +
+        td(sh_10_1.label, sh_10_1.bg) +
+        `</tr>`;
+
+    // 策略建议（基于全段 10Y-1Y 为主，短端/中段作辅）
+    const mainShape = sh_10_1.label;
+    let strategy;
+    if (mainShape === '倒挂') {
+        strategy = '🔴 倒挂→防御：缩久期、转短债/货币。短端反超长端常预示衰退，保命优先。';
+    } else if (mainShape === '陡峭') {
+        strategy = '🟡 陡峭→哑铃：短端(流动性)+长端(博收益)，少配中段。长端收益率相对高(便宜)，短端对冲利率上行风险。';
+    } else if (mainShape === '平坦') {
+        strategy = '🔵 平坦→子弹：集中中段(2-5Y)吃骑乘收益。长短端接近，中段性价比最好。';
+    } else {
+        // 中位：看趋势（1年前对比）判断在往哪走
+        if (ya10 != null && ya1 != null) {
+            const wasSpread = ya10 - ya1;
+            if (cur_10_1 > wasSpread + 0.05) strategy = '🟡 中位偏陡峭化→轻哑铃：利差在走阔，可适度向两端倾斜。';
+            else if (cur_10_1 < wasSpread - 0.05) strategy = '🔵 中位偏平坦化→轻子弹：利差在收窄，中段相对受益。';
+            else strategy = '⚪ 中位横盘：形态不明确，维持均衡配置，待趋势明朗。';
+        } else {
+            strategy = '⚪ 中位：形态不明确，维持均衡配置。';
+        }
+    }
+    strat.innerHTML = '<strong>形态策略：</strong>' + strategy;
 }
 
 /* ===================== 利率周期图表 ===================== */
@@ -947,114 +1125,6 @@ const RATES_STATIC = {
         2018:2.9,2019:2.5,2020:1.5,2021:2.3,2022:1.9,2023:1.8,2024: 1.4,2025:1.4
     }
 };
-const WIN_DAYS = { '1m':30, '3m':90, '6m':180, '1y':365, '3y':1095, '5y':1825, '10y':3650, 'all':0 };
-let RATE_CHART = null;
-let RATE_CUTOFF = null;   // 当前窗口起始时间戳（ms）
-let RATE_SPAN_DAYS = 365; // 当前窗口跨度（天），决定x轴刻度粒度
-
-function _ts(s) { return new Date(s + 'T00:00:00+08:00').getTime(); }
-
-function _mergeSeries(cutoffTs) {
-    const dyn10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? AUTO_RATES.history_10y : {};
-    const dyn1  = (window.AUTO_RATES && AUTO_RATES.history_1y)  ? AUTO_RATES.history_1y  : {};
-    let pts10 = [], pts1 = [];
-    // 动态日频（新浪，2022-09 起）：按真实日期过滤
-    for (const [d, v] of Object.entries(dyn10)) { const t = _ts(d); if (t >= cutoffTs) pts10.push([t, v]); }
-    for (const [d, v] of Object.entries(dyn1))  { const t = _ts(d); if (t >= cutoffTs) pts1.push([t, v]); }
-    pts10.sort((a, b) => a[0] - b[0]);
-    pts1.sort((a, b) => a[0] - b[0]);
-    // 静态年度点：只补「动态序列起点之前」的历史，避免稀疏年度点混进短窗口
-    const dynStart = pts10.length ? pts10[0][0] : Infinity;
-    for (const [y, v] of Object.entries(RATES_STATIC.y10)) { const t = _ts(y + '-07-01'); if (t >= cutoffTs && t < dynStart) pts10.push([t, v]); }
-    for (const [y, v] of Object.entries(RATES_STATIC.y1))  { const t = _ts(y + '-07-01'); if (t >= cutoffTs && t < dynStart) pts1.push([t, v]); }
-    pts10.sort((a, b) => a[0] - b[0]);
-    pts1.sort((a, b) => a[0] - b[0]);
-    return { y10: pts10, y1: pts1 };
-}
-
-function drawRateChart(win) {
-    // 高亮按钮
-    document.querySelectorAll('#rateWindowBtns .win-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.win === win);
-    });
-    if (win === 'all') { RATE_CUTOFF = 0; RATE_SPAN_DAYS = 9000; }
-    else {
-        const days = WIN_DAYS[win] || 1095;
-        RATE_CUTOFF = Date.now() - days * 86400000;
-        RATE_SPAN_DAYS = days;
-    }
-    redrawRateChart();
-}
-
-function _fmtTick(t) {
-    const d = new Date(t);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    if (RATE_SPAN_DAYS > 4 * 365) return String(y);   // 长窗口只标年份
-    if (RATE_SPAN_DAYS > 365) return y + '-' + m;     // 标年-月
-    return m + '-' + day;                             // 短窗口标月-日
-}
-
-function _decimate(arr, max) {
-    if (!arr || arr.length <= max) return arr;
-    const step = Math.ceil(arr.length / max);
-    const out = [];
-    for (let i = 0; i < arr.length; i += step) out.push(arr[i]);
-    if (out[out.length - 1][0] !== arr[arr.length - 1][0]) out.push(arr[arr.length - 1]);
-    return out;
-}
-
-function redrawRateChart() {
-    if (RATE_CUTOFF == null) { drawRateChart('3y'); return; }
-    const merged = _mergeSeries(RATE_CUTOFF);
-    const show10 = document.getElementById('show10y').checked;
-    const show1  = document.getElementById('show1y').checked;
-    const showSp = document.getElementById('showSpread').checked;
-
-    // 长窗口降采样：避免 1024+ 点拖慢渲染
-    const cap = RATE_SPAN_DAYS > 365 ? 400 : 9999;
-    const y10 = _decimate(merged.y10, cap);
-    const y1  = _decimate(merged.y1,  cap);
-
-    const toPts = arr => arr.map(p => ({ x: p[0], y: p[1] }));
-    const datasets = [];
-    if (show10) {
-        datasets.push({ label:'10Y 长端', data: toPts(y10), borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:0 });
-    }
-    if (show1) {
-        datasets.push({ label:'1Y 短端', data: toPts(y1), borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:0 });
-    }
-    if (showSp && show10 && show1) {
-        const m10 = new Map(y10), m1 = new Map(y1);
-        const sp = [...m10.keys()].filter(t => m1.has(t)).sort((a, b) => a - b)
-                    .map(t => ({ x: t, y: +(m10.get(t) - m1.get(t)).toFixed(3) }));
-        datasets.push({ label:'利差(10Y-1Y)', data: sp, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:0, yAxisID:'y2' });
-    }
-
-    const ctx = document.getElementById('rateChart').getContext('2d');
-    if (RATE_CHART) RATE_CHART.destroy();
-    RATE_CHART = new Chart(ctx, {
-        type:'line',
-        data:{ datasets },
-        options:{
-            responsive:true, maintainAspectRatio:false,
-            animation:false,                      // 关闭动画（消除“跳”）
-            animations:{ colors:false, x:false },  // 禁掉颜色/x轴过渡
-            interaction:{ mode:'nearest', axis:'x', intersect:false },
-            scales:{
-                x:{ type:'linear', min: RATE_CUTOFF || undefined, ticks:{ maxTicksLimit:9, font:{size:10}, callback: function(v){ return _fmtTick(v); } }, grid:{ display:false } },
-                y:{ ticks:{ font:{size:10} }, title:{ display:true, text:'收益率 %', font:{size:10} } },
-                y2:{ position:'right', display: showSp && show10 && show1, title:{ display:true, text:'利差 %', font:{size:10} }, grid:{ drawOnChartArea:false } }
-            },
-            plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:14 } }, tooltip:{ callbacks:{ title: function(items){
-                const d = new Date(items[0].parsed.x);
-                return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-            } } } }
-        }
-    });
-}
-
 /* ===================== 债基体检卡 ===================== */
 function runDiagnosis() {
     const name = document.getElementById('diagName').value.trim() || '未命名基金';
@@ -1233,6 +1303,7 @@ function calcGold() {
 /* ===================== 债基 ===================== */
 function calcBond() {
     const y10 = parseFloat(document.getElementById('bondYield10').value) || 0;
+    const y2 = parseFloat(document.getElementById('bondYield2').value) || 0;
     const y1 = parseFloat(document.getElementById('bondYield1').value) || 0;
     const spread = parseFloat(document.getElementById('termSpread').value) || 0;
 
@@ -1240,6 +1311,13 @@ function calcBond() {
     if (y10 < 2.0) y10m.innerHTML = '<span class="badge badge-buy">低利率</span>';
     else if (y10 < 2.8) y10m.innerHTML = '<span class="badge badge-hold">中性</span>';
     else y10m.innerHTML = '<span class="badge badge-sell">高利率</span>';
+
+    const y2m = document.getElementById('yield2Meaning');
+    if (y2m) {
+        if (y2 < 1.5) y2m.innerHTML = '<span class="badge badge-buy">偏低</span>';
+        else if (y2 < 2.3) y2m.innerHTML = '<span class="badge badge-hold">中性</span>';
+        else y2m.innerHTML = '<span class="badge badge-sell">偏高</span>';
+    }
 
     const y1m = document.getElementById('yield1Meaning');
     if (y1 < 1.5) y1m.innerHTML = '<span class="badge badge-buy">宽松</span>';
