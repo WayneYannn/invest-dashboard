@@ -293,7 +293,7 @@
                     <label style="color:#2980b9;"><input type="checkbox" id="show1y" checked onchange="redrawRateChart()"> 1Y（短端）</label>
                     <label style="color:#7f8c8d;"><input type="checkbox" id="showSpread" onchange="redrawRateChart()"> 利差(10Y-1Y)</label>
                 </div>
-                <canvas id="rateChart" height="220"></canvas>
+                <canvas id="rateChart" style="display:block;width:100% !important;height:320px !important;"></canvas>
                 <div style="font-size:11px;color:#999;margin-top:4px;">
                     静态基准：2002–2025 年度均值（Wind/Choice 口径，多家研报交叉）；动态：新浪日频自动抓取（2022-09 起）。数据为历史事实整理，非实时预测。
                 </div>
@@ -634,7 +634,7 @@ function renderAuto(d) {
     const style = {
         '400030':'中票51%+金融债41%','007744':'国开/进出/二级资本债','018771':'短融40%+存单17%+金融债33%'
     };
-    const dur = {'400030':'中短','007744':'中短','018771':'短'};
+    const dur = {'400030':'中','007744':'中','018771':'短'};
     let rows = '';
     for (const c of bondCodes) {
         const f = d.funds && d.funds[c];
@@ -912,6 +912,15 @@ function _fmtTick(t) {
     return m + '-' + day;                             // 短窗口标月-日
 }
 
+function _decimate(arr, max) {
+    if (!arr || arr.length <= max) return arr;
+    const step = Math.ceil(arr.length / max);
+    const out = [];
+    for (let i = 0; i < arr.length; i += step) out.push(arr[i]);
+    if (out[out.length - 1][0] !== arr[arr.length - 1][0]) out.push(arr[arr.length - 1]);
+    return out;
+}
+
 function redrawRateChart() {
     if (RATE_CUTOFF == null) { drawRateChart('3y'); return; }
     const merged = _mergeSeries(RATE_CUTOFF);
@@ -919,19 +928,24 @@ function redrawRateChart() {
     const show1  = document.getElementById('show1y').checked;
     const showSp = document.getElementById('showSpread').checked;
 
+    // 长窗口降采样：避免 1024+ 点拖慢渲染
+    const cap = RATE_SPAN_DAYS > 365 ? 400 : 9999;
+    const y10 = _decimate(merged.y10, cap);
+    const y1  = _decimate(merged.y1,  cap);
+
     const toPts = arr => arr.map(p => ({ x: p[0], y: p[1] }));
     const datasets = [];
     if (show10) {
-        datasets.push({ label:'10Y 长端', data: toPts(merged.y10), borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+        datasets.push({ label:'10Y 长端', data: toPts(y10), borderColor:'#c0392b', backgroundColor:'rgba(192,57,43,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:0 });
     }
     if (show1) {
-        datasets.push({ label:'1Y 短端', data: toPts(merged.y1), borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:.1 });
+        datasets.push({ label:'1Y 短端', data: toPts(y1), borderColor:'#2980b9', backgroundColor:'rgba(41,128,185,.1)', borderWidth:2, spanGaps:true, pointRadius:0, tension:0 });
     }
     if (showSp && show10 && show1) {
-        const m10 = new Map(merged.y10), m1 = new Map(merged.y1);
+        const m10 = new Map(y10), m1 = new Map(y1);
         const sp = [...m10.keys()].filter(t => m1.has(t)).sort((a, b) => a - b)
                     .map(t => ({ x: t, y: +(m10.get(t) - m1.get(t)).toFixed(3) }));
-        datasets.push({ label:'利差(10Y-1Y)', data: sp, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:.1, yAxisID:'y2' });
+        datasets.push({ label:'利差(10Y-1Y)', data: sp, borderColor:'#7f8c8d', borderWidth:1.5, borderDash:[5,4], spanGaps:true, pointRadius:0, tension:0, yAxisID:'y2' });
     }
 
     const ctx = document.getElementById('rateChart').getContext('2d');
@@ -941,6 +955,8 @@ function redrawRateChart() {
         data:{ datasets },
         options:{
             responsive:true, maintainAspectRatio:false,
+            animation:false,                      // 关闭动画（消除“跳”）
+            animations:{ colors:false, x:false },  // 禁掉颜色/x轴过渡
             interaction:{ mode:'nearest', axis:'x', intersect:false },
             scales:{
                 x:{ type:'linear', min: RATE_CUTOFF || undefined, ticks:{ maxTicksLimit:9, font:{size:10}, callback: function(v){ return _fmtTick(v); } }, grid:{ display:false } },
