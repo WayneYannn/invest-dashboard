@@ -129,7 +129,7 @@
 
     <div class="data-bar" id="dataBar">
         <span class="upd" id="updTime">自动数据加载中…</span>
-        <span class="upd" style="color:#999;">页面版本 v2026.08.22-5</span>
+        <span class="upd" style="color:#999;">页面版本 v2026.08.22-6</span>
         <span class="legend"><b class="auto">● 自动</b> 基金净值 / 金价　<b class="manual">● 手动</b> PB分位 / 股息率 / 国债收益率 / 仓位</span>
         <span class="tools">
             <button onclick="exportManual()">导出手动值</button>
@@ -327,6 +327,33 @@
                 </table>
                 <div id="curveStrategy" style="margin-top:8px;padding:8px 10px;background:#f6f8fa;border-radius:4px;font-size:12px;color:#555;">形态策略：加载中…</div>
                 <div style="font-size:11px;color:#999;margin-top:4px;">陡峭→哑铃（长短两端·中段少配）· 平坦→子弹（集中中段吃骑乘）· 倒挂→防御（缩久期转短债）。分位越高越陡。</div>
+            </div>
+
+            <!-- ============ 信用利差数据表 ============ -->
+            <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div style="font-weight:600;font-size:14px;color:#333;">💰 信用利差数据表</div>
+                    <span id="creditSpreadDate" style="font-size:11px;color:#999;"></span>
+                </div>
+                <div style="font-size:11px;color:#999;margin-bottom:8px;">信用利差=信用债收益率−同期国债收益率。分位越高=利差越宽=信用债越便宜（可加）；越低=越贵（谨慎）。月度更新即可（慢变量）。</div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f6f8fa;">
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">品种</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">期限</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">收益率</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">信用利差</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">近3年分位</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">位置</th>
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">含义</th>
+                        </tr>
+                    </thead>
+                    <tbody id="creditSpreadBody">
+                        <tr><td colspan="7" style="padding:8px;color:#999;text-align:center;">加载中…</td></tr>
+                    </tbody>
+                </table>
+                <div id="creditSpreadJudge" style="margin-top:8px;padding:10px 12px;background:#fff8e1;border-radius:4px;font-size:12px;color:#555;line-height:1.7;">信用利差判断：加载中…</div>
+                <div style="font-size:11px;color:#999;margin-top:4px;">🟢 绿=利差高位(便宜可加) · 🔴 红=利差低位(贵需谨慎) · 数据来源：中债登官方曲线+国泰海通研报(近3年分位)。月度更新，非实时。</div>
             </div>
 
             <div class="sources">
@@ -675,6 +702,67 @@ async function loadAuto() {
     }
     // 加载已保存的债基穿透数据（可选，失败不阻塞）
     loadBonds();
+    loadCreditSpreads();
+}
+
+/* ===================== 信用利差数据加载（data/credit_spreads.json） ===================== */
+let CREDIT_SPREADS = null;
+
+async function loadCreditSpreads() {
+    const body = document.getElementById('creditSpreadBody');
+    const judge = document.getElementById('creditSpreadJudge');
+    try {
+        const res = await fetch('data/credit_spreads.json?t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        CREDIT_SPREADS = await res.json();
+        renderCreditSpreads();
+    } catch (e) {
+        CREDIT_SPREADS = null;
+        if (body) body.innerHTML = '<tr><td colspan="7" style="padding:8px;color:#999;text-align:center;">信用利差数据未加载（data/credit_spreads.json 不存在或路径不对）</td></tr>';
+        if (judge) judge.innerHTML = '信用利差判断：数据未加载';
+    }
+}
+
+function renderCreditSpreads() {
+    const body = document.getElementById('creditSpreadBody');
+    const judge = document.getElementById('creditSpreadJudge');
+    const dateEl = document.getElementById('creditSpreadDate');
+    if (!body || !CREDIT_SPREADS) return;
+
+    if (dateEl && CREDIT_SPREADS.updated_at) dateEl.textContent = '数据日期：' + CREDIT_SPREADS.updated_at;
+
+    const td = (html, extra) => `<td style="padding:7px 8px;border:1px solid #e3e3e3;text-align:center;${extra || ''}">${html}</td>`;
+    // 高亮：分位高(>80)=绿(便宜可加)，低(<20)=红(贵)
+    const pctBg = (p) => p == null ? '' : (p >= 80 ? 'background:#e6ffec;font-weight:600;' : (p <= 20 ? 'background:#ffebe9;font-weight:600;' : ''));
+    const posBg = (pos) => {
+        if (!pos) return '';
+        if (pos.indexOf('极低') >= 0 || pos.indexOf('低') >= 0) return 'background:#ffebe9;font-weight:600;';
+        if (pos.indexOf('高') >= 0) return 'background:#e6ffec;font-weight:600;';
+        return '';
+    };
+
+    const rows = (CREDIT_SPREADS.credit_spreads || []).map(c => {
+        return `<tr>` +
+            `<td style="padding:7px 8px;border:1px solid #e3e3e3;">${c.name}</td>` +
+            td(c.term) +
+            td(`<b>${c.yield.toFixed(2)}%</b>`) +
+            td(`<b>${c.spread_bp}bp</b>`) +
+            td(c.pct_3y == null ? '—' : c.pct_3y + '%', pctBg(c.pct_3y)) +
+            td(c.position || '—', posBg(c.position)) +
+            `<td style="padding:7px 8px;border:1px solid #e3e3e3;font-size:12px;color:#666;">${c.meaning || ''}</td>` +
+            `</tr>`;
+    });
+    body.innerHTML = rows.join('');
+
+    // 判断结论
+    const j = CREDIT_SPREADS.judgment;
+    if (j && judge) {
+        judge.innerHTML =
+            `<strong>📊 信用利差判断：</strong>${j.summary}<br>` +
+            `<strong>📌 操作建议：</strong>${j.action}<br>` +
+            `<strong>📈 趋势：</strong>${j.trend}<br>` +
+            `<strong>⚠️ 风险：</strong>${j.risk}`;
+    }
 }
 
 /* ===================== 债基穿透数据加载（data/bonds.json） ===================== */
