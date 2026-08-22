@@ -259,6 +259,19 @@
                 </ul>
             </div>
 
+            <!-- ============ 周期信号清单（多信号，自行综合判断） ============ -->
+            <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <div style="font-weight:600;font-size:14px;color:#333;">📡 周期信号清单（S1–S4 · 互相独立，自行综合）</div>
+                </div>
+                <div id="cycleSignalList" style="font-size:13px;color:#555;line-height:1.9;">
+                    <div style="color:#999;">加载中…（依赖利率数据与历史序列）</div>
+                </div>
+                <div style="font-size:11px;color:#999;margin-top:6px;">
+                    S1 相对位置法（近20年分位+近3月趋势）· S2 政策意图法（1Y短端近6月方向）· S3 曲线形态法（利差 vs 历史中位）· S4 实际利率法（名义−CPI，CPI 默认 2% 待手动）。多信号可能不一致，判断权在你。
+                </div>
+            </div>
+
             <!-- ============ 利率周期图表 ============ -->
             <div style="margin-top:14px;border-top:1px dashed #e3e3e3;padding-top:14px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -696,8 +709,7 @@ function applyRates(rates) {
         RATE_SOURCE = 'manual';
         if (srcEl) srcEl.innerHTML = '<span style="color:#cf222e;font-size:11px;font-weight:600;">手动 · 自动源不可用，请自行录入</span>';
     }
-    calcBond();
-    renderCycleSignals();
+    calcBond();            // 内部会触发 renderCycleSignals()
     drawRateChart('3y');   // 默认绘制近3年
 }
 function markAuto(id) {
@@ -706,52 +718,130 @@ function markAuto(id) {
 }
 
 /* ===================== 周期信号计算（S1–S4） ===================== */
+// 序列趋势：近 N 天首尾变化（下行/上行/横盘，阈值15bp）
+function _trendOf(pairs, days) {
+    if (!pairs || pairs.length < 2) return null;
+    const sorted = [...pairs].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    const last = sorted[sorted.length - 1];
+    const t0 = new Date(last[0] + 'T00:00:00+08:00').getTime() - days * 86400000;
+    const cut = new Date(t0).toISOString().slice(0, 10);
+    let first = sorted.find(p => p[0] >= cut);
+    if (!first) first = sorted[0];
+    if (first[0] === last[0]) return null;
+    const diff = last[1] - first[1];
+    if (diff < -0.15) return '下行' + diff.toFixed(2) + 'pct';
+    if (diff > 0.15) return '上行+' + diff.toFixed(2) + 'pct';
+    return '横盘';
+}
+
 function calcSignals() {
     const y10 = parseFloat(document.getElementById('bondYield10').value) || 0;
-    const y2 = parseFloat(document.getElementById('bondYield1').value) || 0;
+    const y1 = parseFloat(document.getElementById('bondYield1').value) || 0;
     const spread = parseFloat(document.getElementById('termSpread').value) || 0;
-    // 基准分位（近5年经验区间，实际可由历史序列替换）
-    const Y10_LOW = 1.5, Y10_HIGH = 3.0;   // 近5年大致运行区间
-    const pct = Math.max(0, Math.min(100, (y10 - Y10_LOW) / (Y10_HIGH - Y10_LOW) * 100));
 
-    // S1 相对位置法：依赖分位+趋势（趋势用经验默认横盘，可由历史序列增强）
-    let s1 = '震荡（横盘）';
-    if (pct < 20) s1 = '降息通道（低位）';
-    else if (pct > 80) s1 = '加息通道（高位）';
+    // 历史序列（新浪日频，约4年，自动抓取时可用）
+    const h10 = (window.AUTO_RATES && AUTO_RATES.history_10y) ? Object.entries(AUTO_RATES.history_10y) : [];
+    const h1  = (window.AUTO_RATES && AUTO_RATES.history_1y) ? Object.entries(AUTO_RATES.history_1y) : [];
 
-    // S2 政策意图法：MLF 未自动获取时用10Y相对中枢判断宽松/收紧
-    let s2 = '中性';
-    if (y10 < 2.0) s2 = '宽松（利率偏低）';
-    else if (y10 > 2.5) s2 = '收紧（利率偏高）';
+    let pct = null, trend10 = null, trend1 = null, spreadMed = null;
+    const hasHist = h10.length > 200;
 
-    // S3 曲线形态法：期限利差
-    let s3 = '中性（利差居中）';
-    if (spread < 0) s3 = '防御（曲线倒挂）';
-    else if (spread > 0.6) s3 = '进攻（曲线陡峭）';
+    if (hasHist) {
+        // 分位池：静态年度均值(2002起·20年) + 动态日频(近4年)，自适应区间、不依赖绝对阈值
+        const pool = h10.map(p => p[1]).concat(Object.values(RATES_STATIC.y10));
+        pct = Math.round(pool.filter(v => v <= y10).length / pool.length * 100);
+        trend10 = _trendOf(h10, 90);   // 10Y 近3月趋势
+        trend1 = _trendOf(h1, 180);    // 1Y 近6月趋势（政策/资金面方向）
+        // 利差历史中位数（两序列共同日期，日频）
+        const m10 = new Map(h10), m1 = new Map(h1);
+        const sps = [...m10.keys()].filter(d => m1.has(d))
+            .map(d => m10.get(d) - m1.get(d)).sort((a, b) => a - b);
+        if (sps.length > 200) spreadMed = sps[Math.floor(sps.length / 2)];
+    }
 
-    // S4 实际利率法：名义-通胀（通胀默认2%，可由CPI替换）
+    // S1 相对位置法：历史分位 + 近3月趋势（有历史序列时）
+    let s1;
+    if (pct != null) {
+        const tr = trend10 || '趋势缺';
+        if (pct <= 20 && trend10 && trend10.indexOf('下行') >= 0) s1 = '降息通道（分位' + pct + '%·' + tr + '）';
+        else if (pct >= 80 && trend10 && trend10.indexOf('上行') >= 0) s1 = '加息通道（分位' + pct + '%·' + tr + '）';
+        else if (pct <= 20) s1 = '低位（分位' + pct + '%·' + tr + '，趋势未确认）';
+        else if (pct >= 80) s1 = '高位（分位' + pct + '%·' + tr + '，趋势未确认）';
+        else s1 = '震荡（分位' + pct + '%·' + tr + '）';
+    } else {
+        // 降级：无历史序列时按近5年经验区间
+        const p2 = Math.max(0, Math.min(100, (y10 - 1.5) / (3.0 - 1.5) * 100));
+        s1 = p2 < 20 ? '降息通道（经验区间低位）' : (p2 > 80 ? '加息通道（经验区间高位）' : '震荡（经验区间' + Math.round(p2) + '%）');
+    }
+
+    // S2 政策意图法：优先看 1Y 短端近6月方向（资金面/政策敏感端），降级看 1Y 水平
+    let s2;
+    if (trend1) {
+        if (trend1.indexOf('下行') >= 0) s2 = '宽松（1Y近6月' + trend1 + '）';
+        else if (trend1.indexOf('上行') >= 0) s2 = '收紧（1Y近6月' + trend1 + '）';
+        else s2 = '中性（1Y近6月横盘）';
+    } else if (y1 > 0) {
+        s2 = y1 < 1.5 ? '偏宽松（1Y=' + y1.toFixed(2) + '%低位）' : (y1 > 2.5 ? '偏收紧（1Y=' + y1.toFixed(2) + '%高位）' : '中性（1Y=' + y1.toFixed(2) + '%）');
+    } else {
+        s2 = '中性（1Y数据缺）';
+    }
+
+    // S3 曲线形态法：利差 vs 历史中位数，降级用绝对阈值
+    let s3;
+    if (spreadMed != null) {
+        if (spread < 0) s3 = '防御（倒挂' + spread.toFixed(2) + '%）';
+        else if (spread < spreadMed - 0.15) s3 = '偏防御（利差' + spread.toFixed(2) + '% < 中位' + spreadMed.toFixed(2) + '%）';
+        else if (spread > spreadMed + 0.15) s3 = '偏进攻（利差' + spread.toFixed(2) + '% > 中位' + spreadMed.toFixed(2) + '%）';
+        else s3 = '中性（利差' + spread.toFixed(2) + '% ≈ 中位' + spreadMed.toFixed(2) + '%）';
+    } else {
+        s3 = spread < 0 ? '防御（曲线倒挂）' : (spread > 0.6 ? '进攻（曲线陡峭）' : '中性（利差居中）');
+    }
+
+    // S4 实际利率法：名义−CPI（CPI 未自动抓取，默认按 2% 估算）
     const cpi = 2.0;
     const real = y10 - cpi;
-    let s4 = '中性（实际利率近0）';
-    if (real < 0) s4 = '宽松（实际利率为负）';
-    else if (real > 1) s4 = '收紧（实际利率为正且高）';
+    let s4;
+    if (real < 0) s4 = '宽松（实际利率≈' + real.toFixed(2) + '%为负·CPI按默认2%）';
+    else if (real > 1) s4 = '收紧（实际利率≈' + real.toFixed(2) + '%偏高·CPI按默认2%）';
+    else s4 = '中性（实际利率≈' + real.toFixed(2) + '%·CPI按默认2%）';
 
-    return { y10, y2, spread, pct, s1, s2, s3, s4 };
+    return { y10, y1, spread, pct, trend10, trend1, spreadMed, s1, s2, s3, s4, hasHist };
 }
 function renderCycleSignals() {
     const sig = calcSignals();
     const box = document.getElementById('diagCycleSignals');
     if (box) {
         box.innerHTML =
-            `当前10Y=${sig.y10.toFixed(2)}%　利差=${sig.spread.toFixed(2)}%<br>` +
+            `当前10Y=${sig.y10.toFixed(2)}%　1Y=${sig.y1.toFixed(2)}%　利差=${sig.spread.toFixed(2)}%<br>` +
             `S1 相对位置：${sig.s1}<br>` +
             `S2 政策意图：${sig.s2}<br>` +
             `S3 曲线形态：${sig.s3}<br>` +
             `S4 实际利率：${sig.s4}`;
     }
+    // 显式信号清单（市场环境卡内）
+    const list = document.getElementById('cycleSignalList');
+    if (list) {
+        const row = (name, desc, val, tone) => {
+            const color = tone === 'ease' ? '#1a7f37' : (tone === 'tight' ? '#cf222e' : '#9a6700');
+            return `<div style="display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px dashed #f0f0f0;">
+                <span style="min-width:96px;font-weight:600;color:#333;">${name}</span>
+                <span style="min-width:120px;color:#999;font-size:12px;">${desc}</span>
+                <span style="color:${color};font-weight:500;">${val}</span>
+            </div>`;
+        };
+        // 客观计数（不替你合成结论）
+        const easeCount = [sig.s1, sig.s2, sig.s3, sig.s4].filter(s => s.indexOf('降息通道') >= 0 || s.indexOf('宽松') >= 0 || s.indexOf('进攻') >= 0).length;
+        const tightCount = [sig.s1, sig.s2, sig.s3, sig.s4].filter(s => s.indexOf('加息通道') >= 0 || s.indexOf('收紧') >= 0 || s.indexOf('防御') >= 0).length;
+        list.innerHTML =
+            row('S1 相对位置', '分位(近20年)+趋势(近3月)', sig.s1, sig.s1.indexOf('降息') >= 0 ? 'ease' : (sig.s1.indexOf('加息') >= 0 ? 'tight' : '')) +
+            row('S2 政策意图', '1Y短端近6月方向', sig.s2, sig.s2.indexOf('宽松') >= 0 ? 'ease' : (sig.s2.indexOf('收紧') >= 0 ? 'tight' : '')) +
+            row('S3 曲线形态', '利差 vs 历史中位', sig.s3, sig.s3.indexOf('进攻') >= 0 ? 'ease' : (sig.s3.indexOf('防御') >= 0 ? 'tight' : '')) +
+            row('S4 实际利率', '名义10Y − CPI(默认2%)', sig.s4, sig.s4.indexOf('宽松') >= 0 ? 'ease' : (sig.s4.indexOf('收紧') >= 0 ? 'tight' : '')) +
+            `<div style="padding-top:8px;font-size:12px;color:#666;">客观计数：偏宽松信号 ${easeCount} 个 · 偏收紧信号 ${tightCount} 个 · 其余中性。${sig.hasHist ? '（基于自动抓取的历史序列计算）' : '（⚠️ 无历史序列，S1/S3 为降级经验区间判断）'}</div>`;
+    }
     const envEl = document.getElementById('bondEnvRec');
     if (envEl) {
-        envEl.innerHTML = `<strong>环境判断：${sig.s1} · ${sig.s3}</strong><br>综合多信号，按上方规则执行。`;
+        envEl.innerHTML = `<strong>环境判断：${sig.s1} · ${sig.s3}</strong><br>多信号并列见下方「周期信号清单」，综合判断权在你。`;
     }
 }
 
@@ -898,11 +988,12 @@ function runDiagnosis() {
 
     // 风险承受匹配
     const riskTol = { low: 2, mid: 5, high: 99 }[risk];
+    const riskTxt = { low: '<2%', mid: '2–5%', high: '>5%' }[risk];
     const estDrawdown = { short: 1.5, mid: 3.5, long: 6 }[dur];
     if (estDrawdown > riskTol) {
-        score -= 1; reasons.push(`⚠️ 预估最大回撤约${estDrawdown}%，超出你的风险承受(${riskTol}%)。`);
+        score -= 1; reasons.push(`⚠️ 预估最大回撤约${estDrawdown}%，超出你的风险承受(${riskTxt})。`);
     } else {
-        reasons.push(`✓ 预估回撤约${estDrawdown}% ≤ 你的承受(${riskTol}%)。`);
+        reasons.push(`✓ 预估回撤约${estDrawdown}% ≤ 你的承受(${riskTxt})。`);
     }
 
     // 曲线形态补充
@@ -1073,6 +1164,8 @@ function calcBond() {
     }
     rec.className = 'recommendation ' + cls;
     rec.innerHTML = '<strong>环境判断：' + envText + '</strong><br>' + advice;
+    // 同步刷新周期信号清单（手动改输入框时也保持一致）
+    renderCycleSignals();
 }
 
 /* ===================== 红利低波 ===================== */
