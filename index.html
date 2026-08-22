@@ -596,6 +596,29 @@
             </div>
         </div>
 
+        <!-- ============ 组合层面分析（假分散检测） ============ -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🔗</span>组合层面分析 <span class="auto-tag">穿透聚合</span></div>
+            <div class="note" style="margin-top:0;margin-bottom:16px;">汇总已保存债基的穿透数据，判断组合是否真分散。若两只债基同涨同跌（类型/久期/信用相近），等于没分散。</div>
+            <div id="portfolioBox" style="display:none;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;">
+                    <thead>
+                        <tr style="background:#f6f8fa;">
+                            <th style="padding:7px 8px;text-align:left;border:1px solid #e3e3e3;">基金</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">久期</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">信用类型</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">利率债占比</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">信用债占比</th>
+                            <th style="padding:7px 8px;text-align:center;border:1px solid #e3e3e3;">杠杆</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolioBody"></tbody>
+                </table>
+                <div id="portfolioJudge" style="padding:12px;background:#f6f8fa;border-radius:6px;font-size:13px;color:#555;line-height:1.8;">组合判断：加载中…</div>
+            </div>
+            <div id="portfolioEmpty" style="padding:12px;color:#999;font-size:13px;">需先保存至少2只债基的穿透数据（data/bonds.json）才能做组合分析。</div>
+        </div>
+
         <div class="card">
             <div class="card-title"><span class="icon">📋</span>债基 — 持有基金明细 <span class="auto-tag">净值自动</span></div>
             <table>
@@ -920,6 +943,77 @@ function renderSavedBonds() {
         const credTxt = { rate:'利率', mid:'中高', low:'低评' }[b.credit] || '中高';
         return `<button onclick="loadBondToDiag('${code}')" style="padding:6px 12px;background:#fff;border:1px solid #d0d7de;border-radius:6px;font-size:12px;cursor:pointer;">${b.name || code}<br><span style="color:#999;font-size:10px;">${code} · ${durTxt}久期 · ${credTxt}信用</span></button>`;
     }).join('');
+    renderPortfolio();
+}
+
+/* ===================== 组合层面分析（假分散检测） ===================== */
+function renderPortfolio() {
+    const box = document.getElementById('portfolioBox');
+    const empty = document.getElementById('portfolioEmpty');
+    const body = document.getElementById('portfolioBody');
+    const judge = document.getElementById('portfolioJudge');
+    if (!box || !body || !judge) return;
+    if (!BONDS_DATA || !BONDS_DATA.bonds) { box.style.display = 'none'; if (empty) empty.style.display = 'block'; return; }
+    const codes = Object.keys(BONDS_DATA.bonds);
+    if (codes.length < 2) {
+        box.style.display = 'none';
+        if (empty) empty.style.display = 'block';
+        return;
+    }
+    box.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+
+    const bonds = codes.map(c => BONDS_DATA.bonds[c]);
+    const durTxt = { short:'短', mid:'中', long:'长' };
+    const credTxt = { rate:'利率债', mid:'中高等级信用', low:'低评级信用' };
+    const td = (html, extra) => `<td style="padding:7px 8px;border:1px solid #e3e3e3;text-align:center;${extra || ''}">${html}</td>`;
+
+    // 渲染每只债基一行
+    body.innerHTML = bonds.map(b => `<tr>` +
+        `<td style="padding:7px 8px;border:1px solid #e3e3e3;"><b>${b.name || ''}</b><br><span style="color:#999;font-size:11px;">${b.report_date || ''}</span></td>` +
+        td(durTxt[b.duration] || '中') +
+        td(credTxt[b.credit] || '中高') +
+        td(b.rate_ratio != null ? b.rate_ratio + '%' : '—') +
+        td(b.credit_ratio != null ? b.credit_ratio + '%' : '—') +
+        td(b.leverage != null ? b.leverage + 'x' : '—') +
+        `</tr>`).join('');
+
+    // 组合判断：类型分散度 + 久期分散度 + 信用暴露聚合
+    const types = bonds.map(b => b.credit || 'mid');
+    const durs = bonds.map(b => b.duration || 'mid');
+    const allSameType = types.every(t => t === types[0]);
+    const allSameDur = durs.every(d => d === durs[0]);
+
+    // 聚合信用债占比（简单平均，不考虑仓位权重——用户未提供仓位）
+    const avgCreditRatio = bonds.filter(b => b.credit_ratio != null).reduce((a, b) => a + b.credit_ratio, 0) / bonds.filter(b => b.credit_ratio != null).length;
+    const avgRateRatio = bonds.filter(b => b.rate_ratio != null).reduce((a, b) => a + b.rate_ratio, 0) / bonds.filter(b => b.rate_ratio != null).length;
+    const hasBankTier2 = bonds.some(b => /二级资本债|银行二级|TLAC|永续债/.test((b.top5 || []).join()));
+
+    let dispersion, advice, risk;
+    if (allSameType && allSameDur) {
+        dispersion = '⚠️ 低分散：类型与久期全相同';
+        advice = '组合实质是同一类资产加倍。利率上行或信用利差走阔时，两只一起跌，等于没分散。建议换成"一只利率债主导 + 一只信用债主导"做真分散。';
+        risk = '同涨同跌，回撤叠加。';
+    } else if (allSameType) {
+        dispersion = '• 中分散：类型相同但久期不同';
+        advice = '信用类型一致但久期错开，有一定分散。利率周期切换时表现会有差异，但信用冲击下仍同跌。';
+        risk = '信用周期风险未分散。';
+    } else if (allSameDur) {
+        dispersion = '• 中分散：类型不同但久期相同';
+        advice = '信用类型错开但久期一致，利率周期下表现接近。信用冲击有分散，利率冲击未分散。';
+        risk = '利率周期风险未分散。';
+    } else {
+        dispersion = '✓ 较好分散：类型与久期均不同';
+        advice = '组合在类型和久期双维度错开，利率和信用冲击都有一定对冲。属较合理的分散配置。';
+        risk = '风险已分散，关注单一品种集中度。';
+    }
+
+    judge.innerHTML =
+        `<strong>📊 分散度判定：</strong>${dispersion}<br>` +
+        `<strong>📌 配置建议：</strong>${advice}<br>` +
+        (isNaN(avgCreditRatio) ? '' : `<strong>📉 组合平均信用债占比：</strong>${avgCreditRatio.toFixed(1)}%（${avgCreditRatio > 70 ? '信用债主导，关注信用利差周期' : avgCreditRatio > 40 ? '均衡' : '利率债主导'}）<br>`) +
+        (hasBankTier2 ? `<strong>⚠️ 银行二级资本债暴露：</strong>组合含此品种，注意减记条款+流动性冲击风险（参考2022赎回潮）。<br>` : '') +
+        `<strong>⚠️ 诚实点：</strong>本分析未考虑仓位权重（假设等权）。若两只仓位差异大，实际风险暴露偏向重仓那只。补入仓位后可精确计算。`;
 }
 
 function loadBondToDiag(code) {
